@@ -8,6 +8,10 @@ import time
 import threading
 import yfinance as yf
 
+# Duplicate message prevention
+SENT_NEWS_IDS = set()
+STARTUP_SENT = False
+
 BOT_TOKEN = "8920822727:AAEoeYvwnNrIU58ODEJVGCCLiHy1wSa-VAc"
 CHAT_ID = "1212371388"
 TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -250,6 +254,10 @@ def setup_schedule():
 
 
 async def startup_message():
+    global STARTUP_SENT
+    if STARTUP_SENT:
+        return
+    STARTUP_SENT = True
     msg = (
         "✅ <b>India Market Bot STARTED!</b>\n\n"
         "▪Morning briefing: 7:00 AM daily\n"
