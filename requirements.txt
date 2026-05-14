@@ -2,4 +2,4 @@ httpx==0.27.0
 yfinance==0.2.40
 schedule==1.2.2
 pytz==2024.1
-asyncio
+feedparser==6.0.11
