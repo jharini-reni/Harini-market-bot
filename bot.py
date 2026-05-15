@@ -7,92 +7,195 @@ import schedule
 import time
 import yfinance as yf
 import hashlib
+import feedparser
+import re
 
 BOT_TOKEN = "8920822727:AAEoeYvwnNrIU58ODEJVGCCLiHy1wSa-VAc"
 CHAT_ID = "1212371388"
 TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 IST = pytz.timezone("Asia/Kolkata")
-NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
 
-# Duplicate prevention - store sent news IDs
 SENT_IDS = set()
+LAST_BRIEFING_DATE = None
 
-STOCKS = [
-    "Jubilant FoodWorks", "Indian Energy Exchange", "MRPL", "Canara Bank",
-    "Niva Bupa", "Kalyan Jewellers", "RVNL", "Vodafone Idea", "Suzlon Energy",
-    "Inox Wind", "Coal India", "Vedanta", "ITC", "ITC Hotels", "Diamond Cables",
-    "BEL", "Redington", "Bank of Baroda", "Punjab National Bank", "Wipro",
-    "Hyundai India", "IREDA", "Tata Technologies", "Yes Bank", "IDFC First Bank",
-    "Ola Electric", "Ather Energy", "Thangamayil Jewellery", "Geojit Financial",
-    "GoldBees", "SilverBees", "Gold ETF", "Silver ETF",
-    "LG India", "Groww", "Lenskart", "Samman Capital"
+RSS_FEEDS = [
+    ("https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms", "Economic Times"),
+    ("https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms", "Economic Times"),
+    ("https://www.moneycontrol.com/rss/MCtopnews.xml", "Moneycontrol"),
+    ("https://www.livemint.com/rss/markets", "LiveMint"),
+    ("https://feeds.feedburner.com/ndtvprofit-latest", "NDTV Profit"),
+    ("https://www.business-standard.com/rss/markets-106.rss", "Business Standard"),
+    ("https://www.thehindu.com/business/markets/feeder/default.rss", "The Hindu Business"),
+    ("https://economictimes.indiatimes.com/news/economy/rssfeeds/1373380680.cms", "ET Economy"),
+    ("https://feeds.reuters.com/reuters/businessNews", "Reuters"),
+    ("https://search.cnbc.com/rs/search/combinedcms/view.xml?partnerId=wrss01&id=100727362", "CNBC"),
+]
+
+MY_STOCKS = [
+    "jubilant foodworks", "jublfood", "iex", "indian energy exchange",
+    "mrpl", "canara bank", "canbk", "niva bupa", "kalyan jewellers",
+    "kalyankjil", "rvnl", "rail vikas", "vodafone idea",
+    "suzlon", "inox wind", "inoxwind", "coal india", "coalindia",
+    "vedanta", "vedl", "itc ltd", "itc hotel", "itc shares",
+    "bel ", "bharat electronics", "redington",
+    "bank of baroda", "bankbaroda", "punjab national bank", "pnb ",
+    "wipro", "hyundai india", "ireda", "tata technologies", "tatatech",
+    "yes bank", "yesbank", "idfc first", "idfcfirstb",
+    "ola electric", "olaelec", "ather energy", "thangamayil",
+    "geojit", "goldbees", "silverbees", "hdfc silver",
+    "lg india", "groww", "lenskart", "samman capital",
+    "embassy reit", "lemon tree", "eternal ",
+    "diamond cable", "diacabs", "inox wind", "kalyan jewellers"
+]
+
+INDIA_KEYWORDS = [
+    "nifty", "sensex", "bank nifty", "gift nifty", "sgx nifty",
+    "rbi", "sebi", "rupee", "bse", "nse", "india market",
+    "indian stock", "fii", "dii", "repo rate", "inflation india",
+    "modi", "budget india", "gdp india", "ipo india", "dalal street"
+]
+
+GLOBAL_KEYWORDS = [
+    "dow jones", "nasdaq", "s&p 500", "wall street", "us fed",
+    "federal reserve", "crude oil", "brent", "gold price", "silver price",
+    "trump tariff", "trade war", "iran", "russia ukraine",
+    "china economy", "global recession", "interest rate", "opec",
+    "west asia", "middle east", "geopolitical"
+]
+
+SKIP_KEYWORDS = [
+    "cricket", "ipl", "bollywood", "film", "movie", "actor",
+    "recipe", "fashion", "lifestyle", "horoscope", "astrology",
+    "football", "tennis", "hockey", "weather", "tourism",
+    "health tips", "diet", "greystone", "microvast",
+    "canada election", "australia election", "uk politics"
+]
+
+# Smart financial sentiment rules
+STRONG_POSITIVE = [
+    "wins order", "bags order", "new order worth", "order inflow",
+    "profit jumps", "profit rises", "revenue surges", "strong growth",
+    "upgraded to buy", "initiates buy", "target price raised",
+    "mou signed", "receives approval", "rbi approval",
+    "dividend declared", "bonus shares", "stock split",
+    "capacity expansion", "new contract", "fresh order",
+    "record high profit", "beat estimates", "better than expected",
+    "stake acquisition", "promoter buying", "fii buying",
+    "rate cut", "repo rate cut", "dovish", "market rally",
+    "sensex rises", "nifty gains", "gift nifty positive",
+    "dow gains", "nasdaq up", "us market rises"
+]
+
+STRONG_NEGATIVE = [
+    "promoter selling", "promoter stake sale",
+    "fraud detected", "sebi ban", "sebi penalty", "sebi action",
+    "loss widens", "revenue falls", "profit declines", "misses estimates",
+    "downgraded to sell", "target cut", "price target reduced",
+    "penalty imposed", "default risk", "debt restructuring",
+    "ceo resignation", "md quits", "regulatory action",
+    "earnings miss", "margin pressure", "below expectations",
+    "fii selling", "market crash", "sensex falls", "nifty drops",
+    "rate hike", "hawkish", "recession fears",
+    "war escalation", "oil price surge", "rupee falls record low"
 ]
 
 NSE_SYMBOLS = {
-    "JUBLFOOD": "JUBLFOOD.NS", "IEX": "IEX.NS", "MRPL": "MRPL.NS",
-    "CANBK": "CANBK.NS", "KALYANKJIL": "KALYANKJIL.NS", "RVNL": "RVNL.NS",
-    "IDEA": "IDEA.NS", "SUZLON": "SUZLON.NS", "INOXWIND": "INOXWIND.NS",
-    "COALINDIA": "COALINDIA.NS", "VEDL": "VEDL.NS", "ITC": "ITC.NS",
-    "BEL": "BEL.NS", "BANKBARODA": "BANKBARODA.NS", "PNB": "PNB.NS",
-    "WIPRO": "WIPRO.NS", "IREDA": "IREDA.NS", "TATATECH": "TATATECH.NS",
-    "YESBANK": "YESBANK.NS", "IDFCFIRSTB": "IDFCFIRSTB.NS",
-    "OLAELEC": "OLAELEC.NS", "GOLDBEES": "GOLDBEES.NS",
-    "SILVERBEES": "SILVERBEES.NS", "THANGAMAYIL": "THANGAMAYIL.NS",
     "NIFTY50": "^NSEI", "BANKNIFTY": "^NSEBANK", "MIDCAP": "^NSEMDCP50",
     "GOLD": "GC=F", "SILVER": "SI=F",
+    "SUZLON": "SUZLON.NS", "YESBANK": "YESBANK.NS", "IDEA": "IDEA.NS",
+    "RVNL": "RVNL.NS", "OLAELEC": "OLAELEC.NS", "COALINDIA": "COALINDIA.NS",
+    "ITC": "ITC.NS", "CANBK": "CANBK.NS", "IREDA": "IREDA.NS",
+    "WIPRO": "WIPRO.NS", "BEL": "BEL.NS", "VEDL": "VEDL.NS",
+    "JUBLFOOD": "JUBLFOOD.NS", "PNB": "PNB.NS", "BANKBARODA": "BANKBARODA.NS",
+    "INOXWIND": "INOXWIND.NS", "KALYANKJIL": "KALYANKJIL.NS",
+    "TATATECH": "TATATECH.NS", "THANGAMAYIL": "THANGAMAYIL.NS",
 }
 
-NEWS_TOPICS = [
-    ("Indian stock market NSE BSE", "🇮🇳 INDIA MARKET"),
-    ("RBI policy economy India", "🏦 RBI / ECONOMY"),
-    ("Trump trade war global market", "🌍 GLOBAL NEWS"),
-    ("Gold Silver price India", "🥇 GOLD & SILVER"),
-    ("Nifty Bank Nifty sensex today", "📊 INDICES"),
-    ("Suzlon Ola Electric Ather Energy news", "⚡ YOUR STOCKS"),
-    ("Yes Bank IDFC Canara Bank news", "🏦 BANKING STOCKS"),
-    ("Coal India Vedanta ITC news", "🏭 PSU & FMCG"),
-    ("Modi economy policy India", "🇮🇳 INDIA POLICY"),
-    ("war Ukraine Russia China market impact", "⚔️ GEOPOLITICAL"),
-]
+
+def get_sentiment(title: str, summary: str = "") -> tuple:
+    """Smart rule-based sentiment with reason"""
+    t = (title + " " + summary).lower()
+
+    for phrase in STRONG_POSITIVE:
+        if phrase in t:
+            reason = {
+                "wins order": "New order win — revenue visibility improves",
+                "bags order": "Order bagged — positive for earnings",
+                "new order worth": "Fresh order — topline growth expected",
+                "profit jumps": "Strong profit growth — bullish signal",
+                "profit rises": "Profit rising — positive earnings trend",
+                "revenue surges": "Revenue surge — strong business momentum",
+                "upgraded to buy": "Analyst upgrade — institutional confidence",
+                "initiates buy": "New buy recommendation — positive outlook",
+                "target price raised": "Target raised — analysts see upside",
+                "mou signed": "MoU signed — future business secured",
+                "receives approval": "Regulatory approval — removes uncertainty",
+                "rbi approval": "RBI approved — business expansion cleared",
+                "dividend declared": "Dividend declared — rewards shareholders",
+                "bonus shares": "Bonus shares — positive for retail investors",
+                "rate cut": "Rate cut — boosts market liquidity & sentiment",
+                "repo rate cut": "RBI rate cut — positive for banking & markets",
+                "market rally": "Market rally — broad buying interest",
+                "sensex rises": "Sensex up — positive market open expected",
+                "nifty gains": "Nifty gaining — bullish momentum",
+                "gift nifty positive": "GIFT Nifty positive — green opening expected",
+                "dow gains": "Dow up — positive global cues for India",
+                "nasdaq up": "Nasdaq rising — IT stocks may benefit",
+                "promoter buying": "Promoter buying — insider confidence signal",
+                "fii buying": "FII inflows — foreign confidence in India market",
+            }.get(phrase, "Positive development for the stock")
+            return "positive", reason
+
+    for phrase in STRONG_NEGATIVE:
+        if phrase in t:
+            reason = {
+                "promoter selling": "Promoter selling stake — insider exit signal ⚠️",
+                "fraud detected": "Fraud detected — high risk, avoid ⚠️",
+                "sebi ban": "SEBI ban — regulatory risk, negative ⚠️",
+                "sebi penalty": "SEBI penalty — compliance concern ⚠️",
+                "loss widens": "Loss widening — fundamentals weak ⚠️",
+                "revenue falls": "Revenue declining — business slowdown ⚠️",
+                "profit declines": "Profit falling — negative earnings trend ⚠️",
+                "downgraded to sell": "Analyst downgrade — institutional exit signal ⚠️",
+                "target cut": "Price target cut — analysts see downside ⚠️",
+                "ceo resignation": "CEO resigned — leadership uncertainty ⚠️",
+                "rate hike": "Rate hike — negative for markets & borrowing costs",
+                "recession fears": "Recession fears — risk-off sentiment globally",
+                "fii selling": "FII outflows — foreign selling pressure ⚠️",
+                "market crash": "Market crash — broad sell-off ⚠️",
+                "sensex falls": "Sensex falling — negative market sentiment",
+                "nifty drops": "Nifty dropping — bearish pressure",
+                "rupee falls record low": "Rupee at record low — imported inflation risk",
+                "war escalation": "War escalating — geopolitical risk rises ⚠️",
+                "oil price surge": "Oil surging — inflation risk for India",
+            }.get(phrase, "Negative development — caution advised ⚠️")
+            return "negative", reason
+
+    return "neutral", ""
 
 
 async def send_telegram(message: str):
     async with httpx.AsyncClient() as client:
-        payload = {
-            "chat_id": CHAT_ID,
-            "text": message,
-            "parse_mode": "HTML",
-            "disable_web_page_preview": True,
-        }
         try:
-            await client.post(TELEGRAM_URL, json=payload, timeout=10)
-            await asyncio.sleep(0.5)  # Avoid telegram rate limit
+            await client.post(TELEGRAM_URL, json={
+                "chat_id": CHAT_ID,
+                "text": message,
+                "parse_mode": "HTML",
+                "disable_web_page_preview": True,
+            }, timeout=10)
+            await asyncio.sleep(1)
         except Exception as e:
             print(f"Telegram error: {e}")
 
 
-def get_news_id(title: str) -> str:
+def get_id(title: str) -> str:
     return hashlib.md5(title.encode()).hexdigest()
 
 
-async def fetch_news(query: str, count: int = 3) -> list:
-    if not NEWS_API_KEY:
-        return []
-    url = "https://newsapi.org/v2/everything"
-    params = {
-        "q": query,
-        "language": "en",
-        "sortBy": "publishedAt",
-        "pageSize": count,
-        "apiKey": NEWS_API_KEY,
-    }
-    try:
-        async with httpx.AsyncClient() as client:
-            r = await client.get(url, params=params, timeout=10)
-            data = r.json()
-            return data.get("articles", [])
-    except:
-        return []
+def clean_text(text: str) -> str:
+    text = re.sub('<[^<]+?>', '', text)
+    text = re.sub(r'\s+', ' ', text)
+    return text.strip()
 
 
 def get_price(symbol_key: str) -> str:
@@ -100,112 +203,171 @@ def get_price(symbol_key: str) -> str:
     if not yf_sym:
         return "N/A"
     try:
-        ticker = yf.Ticker(yf_sym)
-        hist = ticker.history(period="1d", interval="5m")
+        hist = yf.Ticker(yf_sym).history(period="5d", interval="5m")
         if hist.empty:
             return "N/A"
         price = hist["Close"].iloc[-1]
-        open_price = hist["Open"].iloc[0]
-        change = price - open_price
-        pct = (change / open_price) * 100
-        arrow = "🟢" if change >= 0 else "🔴"
+        open_p = hist["Open"].iloc[0]
+        pct = ((price - open_p) / open_p) * 100
+        arrow = "🟢" if pct >= 0 else "🔴"
         return f"{arrow} ₹{price:.2f} ({pct:+.2f}%)"
     except:
         return "N/A"
 
 
-async def send_live_news():
-    """Runs every 10 mins — sends only NEW news, no duplicates"""
+def is_my_stock(title: str) -> bool:
+    return any(s in title.lower() for s in MY_STOCKS)
+
+
+def is_india_news(title: str) -> bool:
+    return any(kw in title.lower() for kw in INDIA_KEYWORDS)
+
+
+def is_global_impact(title: str) -> bool:
+    return any(kw in title.lower() for kw in GLOBAL_KEYWORDS)
+
+
+def should_skip(title: str) -> bool:
+    return any(skip in title.lower() for skip in SKIP_KEYWORDS)
+
+
+async def fetch_and_send_news():
     global SENT_IDS
-    found_any = False
+    india_news = []
+    global_news = []
+    positive_stocks = []
+    negative_stocks = []
+    neutral_stocks = []
 
-    for query, label in NEWS_TOPICS:
-        articles = await fetch_news(query, 3)
-        new_articles = []
+    for feed_url, source in RSS_FEEDS:
+        try:
+            feed = feedparser.parse(feed_url)
+            for entry in feed.entries[:20]:
+                title = entry.get("title", "").strip()
+                summary = clean_text(entry.get("summary", "") or entry.get("description", ""))
+                if not title or len(title) < 10 or should_skip(title):
+                    continue
+                nid = get_id(title)
+                if nid in SENT_IDS:
+                    continue
+                SENT_IDS.add(nid)
 
-        for a in articles:
-            news_id = get_news_id(a.get("title", ""))
-            if news_id not in SENT_IDS:
-                SENT_IDS.add(news_id)
-                new_articles.append(a)
+                if is_my_stock(title):
+                    sentiment, reason = get_sentiment(title, summary)
+                    context = reason if reason else (summary[:120] + "..." if len(summary) > 120 else summary)
+                    item = f"▪️<b>{title}</b>\n"
+                    if context:
+                        item += f"💡 {context}\n"
+                    item += f"Source: {source}"
+                    if sentiment == "positive":
+                        positive_stocks.append(item)
+                    elif sentiment == "negative":
+                        negative_stocks.append(item)
+                    else:
+                        neutral_stocks.append(item)
+                elif is_india_news(title):
+                    context = summary[:120] + "..." if len(summary) > 120 else summary
+                    item = f"▪️<b>{title}</b>"
+                    if context and context[:50].lower() != title[:50].lower():
+                        item += f"\n{context}"
+                    item += f"\nSource: {source}"
+                    india_news.append(item)
+                elif is_global_impact(title):
+                    context = summary[:120] + "..." if len(summary) > 120 else summary
+                    item = f"▪️<b>{title}</b>"
+                    if context and context[:50].lower() != title[:50].lower():
+                        item += f"\n{context}"
+                    item += f"\nSource: {source}"
+                    global_news.append(item)
 
-        if new_articles:
-            found_any = True
-            now = datetime.now(IST).strftime("%I:%M %p")
-            msg = f"<b>{label} | {now} IST</b>\n{'─'*25}\n\n"
-            for a in new_articles:
-                title = a.get("title", "")
-                source = a.get("source", {}).get("name", "Unknown")
-                url = a.get("url", "")
-                published = a.get("publishedAt", "")[:10]
-                msg += f"▪{title}\n🔗 {source} | {published}\n{url}\n\n"
-            await send_telegram(msg)
+        except Exception as e:
+            print(f"RSS error {source}: {e}")
 
-    # Keep SENT_IDS from growing too large
-    if len(SENT_IDS) > 1000:
-        SENT_IDS = set(list(SENT_IDS)[-500:])
+    if not any([india_news, global_news, positive_stocks, negative_stocks, neutral_stocks]):
+        print("No new news")
+        return
 
+    now = datetime.now(IST).strftime("%d %b %Y | %I:%M %p IST")
+    msg = f"📊 <b>MARKET UPDATE</b>\n<b>{now}</b>\n{'─'*30}\n\n"
 
-async def morning_briefing():
-    """7 AM full briefing"""
-    now = datetime.now(IST).strftime("%d %b %Y")
-    msg = f"🌅 <b>MORNING MARKET BRIEFING</b>\n<b>{now} | 7:00 AM IST</b>\n{'─'*25}\n\n"
+    if india_news:
+        msg += "<b>🇮🇳 INDIA MARKET CUES</b>\n\n"
+        for item in india_news[:4]:
+            msg += f"{item}\n\n"
 
-    # Indices
-    msg += "<b>📊 KEY INDICES</b>\n"
-    for name, key in [("Nifty 50", "NIFTY50"), ("Bank Nifty", "BANKNIFTY"), ("Midcap 50", "MIDCAP")]:
-        msg += f"▪{name}: {get_price(key)}\n"
+    if global_news:
+        msg += "<b>🌍 GLOBAL CUES</b>\n\n"
+        for item in global_news[:3]:
+            msg += f"{item}\n\n"
 
-    # Commodities
-    msg += "\n<b>🪙 GOLD & SILVER</b>\n"
-    msg += f"▪Gold: {get_price('GOLD')}\n"
-    msg += f"▪Silver: {get_price('SILVER')}\n"
+    if positive_stocks:
+        msg += "<b>🟢 Positive Sentiment Stocks</b>\n\n"
+        for item in positive_stocks[:4]:
+            msg += f"{item}\n\n"
 
-    # Focus stocks today
-    msg += "\n<b>🔍 FOCUS STOCKS TODAY</b>\n"
-    focus = ["SUZLON", "YESBANK", "IDEA", "RVNL", "OLAELEC", "COALINDIA", "ITC", "CANBK"]
-    for s in focus:
-        msg += f"▪{s}: {get_price(s)}\n"
+    if negative_stocks:
+        msg += "<b>🔴 Negative Sentiment Stocks</b>\n\n"
+        for item in negative_stocks[:3]:
+            msg += f"{item}\n\n"
+
+    if neutral_stocks:
+        msg += "<b>⚪ Stocks To Watch</b>\n\n"
+        for item in neutral_stocks[:3]:
+            msg += f"{item}\n\n"
 
     await send_telegram(msg)
 
-    # Morning news digest
-    await asyncio.sleep(2)
-    news_msg = f"📰 <b>MORNING NEWS DIGEST | {now}</b>\n{'─'*25}\n\n"
+    if len(SENT_IDS) > 2000:
+        SENT_IDS = set(list(SENT_IDS)[-1000:])
 
-    for query, label in NEWS_TOPICS[:6]:
-        articles = await fetch_news(query, 2)
-        if articles:
-            news_msg += f"<b>{label}</b>\n"
-            for a in articles:
-                title = a.get("title", "")
-                source = a.get("source", {}).get("name", "")
-                url = a.get("url", "")
-                news_id = get_news_id(title)
-                SENT_IDS.add(news_id)
-                news_msg += f"▪{title}\n🔗 {source}\n{url}\n\n"
 
-    await send_telegram(news_msg)
+async def morning_briefing():
+    global LAST_BRIEFING_DATE
+    today = datetime.now(IST).strftime("%Y-%m-%d")
+    if LAST_BRIEFING_DATE == today:
+        return
+    LAST_BRIEFING_DATE = today
+
+    now = datetime.now(IST).strftime("%d %b %Y")
+    msg = f"🌅 <b>GOOD MORNING — MARKET BRIEFING</b>\n<b>{now} | 7:00 AM IST</b>\n{'─'*30}\n\n"
+
+    msg += "<b>📊 KEY INDICES</b>\n"
+    for name, key in [("Nifty 50","NIFTY50"),("Bank Nifty","BANKNIFTY"),("Midcap 50","MIDCAP")]:
+        msg += f"▪️{name}: {get_price(key)}\n"
+
+    msg += "\n<b>🪙 COMMODITIES</b>\n"
+    msg += f"▪️Gold: {get_price('GOLD')}\n"
+    msg += f"▪️Silver: {get_price('SILVER')}\n"
+
+    msg += "\n<b>📈 YOUR STOCKS SNAPSHOT</b>\n"
+    for s in ["SUZLON","YESBANK","IDEA","RVNL","COALINDIA","ITC",
+              "CANBK","IREDA","WIPRO","BEL","VEDL","JUBLFOOD",
+              "PNB","BANKBARODA","INOXWIND","KALYANKJIL","TATATECH"]:
+        msg += f"▪️{s}: {get_price(s)}\n"
+
+    await send_telegram(msg)
+    await asyncio.sleep(3)
+    await fetch_and_send_news()
+
+
+async def keep_alive():
+    try:
+        async with httpx.AsyncClient() as client:
+            await client.get("https://api.telegram.org", timeout=5)
+    except:
+        pass
 
 
 def run_async(coro):
     asyncio.run(coro)
 
 
-def setup_schedule():
-    # 7 AM morning briefing
-    schedule.every().day.at("07:00").do(lambda: run_async(morning_briefing()))
-
-    # Live news every 10 mins — 24/7
-    schedule.every(10).minutes.do(lambda: run_async(send_live_news()))
-
-
 if __name__ == "__main__":
-    print("Bot started!")
-    setup_schedule()
-    # Run news immediately on start
-    asyncio.run(send_live_news())
+    print("✅ Bot started — Smart Sentiment + India First!")
+    schedule.every().day.at("07:00").do(lambda: run_async(morning_briefing()))
+    schedule.every(15).minutes.do(lambda: run_async(fetch_and_send_news()))
+    schedule.every(10).minutes.do(lambda: run_async(keep_alive()))
+    asyncio.run(fetch_and_send_news())
     while True:
         schedule.run_pending()
         time.sleep(60)
-
