@@ -1,9 +1,8 @@
 # =========================================================
 # AI TELEGRAM STOCK MARKET BOT
-# FINAL PRODUCTION VERSION
+# FINAL READY TO USE VERSION
 # =========================================================
 
-import os
 import asyncio
 import httpx
 import feedparser
@@ -15,26 +14,23 @@ from pytz import timezone
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
 from transformers import pipeline
 from rapidfuzz import fuzz
-from dotenv import load_dotenv
 
 # =========================================================
-# LOAD ENV
+# TELEGRAM CONFIG
 # =========================================================
 
-load_dotenv()
+BOT_TOKEN = "8920822727:AAEoeYvwnNrIU58ODEJVGCCLiHy1wSa-VAc"
+CHAT_ID = "1212371388"
 
-BOT_TOKEN = os.getenv("8920822727:AAEoeYvwnNrIU58ODEJVGCCLiHy1wSa-VAc")
-CHAT_ID = os.getenv("1212371388")
-
-TELEGRAM_URL = f"https://api.telegram.org/bot{8920822727:AAEoeYvwnNrIU58ODEJVGCCLiHy1wSa-VAc"}/sendMessage"
+TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 
 IST = timezone("Asia/Kolkata")
 
 # =========================================================
-# AI SENTIMENT MODEL
+# LOAD AI MODEL
 # =========================================================
 
-print("Loading AI model...")
+print("Loading AI Model...")
 
 finbert = pipeline(
     "sentiment-analysis",
@@ -134,6 +130,7 @@ async def send_telegram(message):
             print("Message Sent")
 
         except Exception as e:
+
             print("Telegram Error:", e)
 
 # =========================================================
@@ -180,6 +177,7 @@ def get_sentiment(title):
         return "⚪"
 
     except:
+
         return "⚪"
 
 # =========================================================
@@ -191,17 +189,39 @@ def market_impact(title):
     title = title.lower()
 
     rules = {
-        "rbi": "Banking stocks may remain active today.",
-        "inflation": "Markets may react cautiously.",
-        "crude": "Oil-sensitive sectors may face pressure.",
-        "war": "Global volatility may increase.",
-        "railway": "Railway stocks may stay in focus.",
-        "defence": "Defence sector sentiment may improve.",
-        "order": "Positive sentiment possible in related stocks.",
-        "fed": "Global market volatility may continue.",
-        "gold": "Gold-related stocks may stay active.",
-        "silver": "Silver ETFs may remain volatile.",
-        "results": "Stock-specific volatility expected.",
+
+        "rbi":
+        "Banking stocks may remain active today.",
+
+        "inflation":
+        "Markets may react cautiously.",
+
+        "crude":
+        "Oil-sensitive sectors may face pressure.",
+
+        "war":
+        "Global volatility may increase.",
+
+        "railway":
+        "Railway stocks may stay in focus.",
+
+        "defence":
+        "Defence sector sentiment may improve.",
+
+        "order":
+        "Positive sentiment possible in related stocks.",
+
+        "fed":
+        "Global market volatility may continue.",
+
+        "gold":
+        "Gold-related stocks may stay active.",
+
+        "silver":
+        "Silver ETFs may remain volatile.",
+
+        "results":
+        "Stock-specific volatility expected.",
     }
 
     for key, reason in rules.items():
@@ -212,7 +232,7 @@ def market_impact(title):
     return "Monitoring market impact."
 
 # =========================================================
-# MARKET PREDICTION ENGINE
+# MARKET OUTLOOK ENGINE
 # =========================================================
 
 def market_prediction():
@@ -221,7 +241,6 @@ def market_prediction():
 
         dow = yf.Ticker("^DJI").history(period="2d")
         nasdaq = yf.Ticker("^IXIC").history(period="2d")
-        sp500 = yf.Ticker("^GSPC").history(period="2d")
 
         dow_change = (
             (dow["Close"].iloc[-1] - dow["Close"].iloc[-2])
@@ -254,7 +273,7 @@ def market_prediction():
         return "⚪ Market outlook unavailable."
 
 # =========================================================
-# INDEX CHANGE
+# GET INDEX CHANGE
 # =========================================================
 
 def get_change(symbol):
@@ -337,23 +356,22 @@ async def fetch_news():
 
 def format_news(title, sentiment, impact, source):
 
-    return f"""
+    return f'''
 {sentiment} <b>{title}</b>
 
 {impact}
 
 — {source}
-"""
+'''
 
 # =========================================================
-# LIVE MARKET ALERTS
+# LIVE MARKET NEWS
 # =========================================================
 
 async def send_live_news():
 
     now = datetime.now(IST)
 
-    # MARKET HOURS
     if not (8 <= now.hour <= 16):
         return
 
@@ -403,7 +421,7 @@ async def morning_briefing():
 
     outlook = market_prediction()
 
-    msg = f"""
+    msg = f'''
 🌅 <b>MORNING MARKET SETUP</b>
 📅 {today}
 
@@ -437,7 +455,7 @@ async def morning_briefing():
 ▪ Global market cues
 
 ━━━━━━━━━━━━━━
-"""
+'''
 
     await send_telegram(msg)
 
@@ -447,7 +465,6 @@ async def morning_briefing():
 
 scheduler = AsyncIOScheduler(timezone=IST)
 
-# 7 AM BRIEFING
 scheduler.add_job(
     morning_briefing,
     "cron",
@@ -455,7 +472,6 @@ scheduler.add_job(
     minute=0
 )
 
-# LIVE NEWS EVERY 5 MINUTES
 scheduler.add_job(
     send_live_news,
     "interval",
