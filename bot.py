@@ -1,11 +1,11 @@
 # =========================================================
 # AI TELEGRAM STOCK MARKET BOT
-# FINAL ADVANCED VERSION
+# FINAL PREMIUM VERSION
 # INDIA MARKET PRIORITY
 # NO DUPLICATES
 # IMPORTANT NEWS ONLY
+# PROFESSIONAL MARKET SUMMARIES
 # LIVE NEWS EVERY 1 MINUTE
-# RENDER FREE PLAN READY
 # =========================================================
 
 import asyncio
@@ -24,6 +24,7 @@ from rapidfuzz import fuzz
 # =========================================================
 
 BOT_TOKEN = "8920822727:AAEoeYvwnNrIU58ODEJVGCCLiHy1wSa-VAc"
+
 CHAT_ID = "1212371388"
 
 TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
@@ -31,7 +32,7 @@ TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 IST = timezone("Asia/Kolkata")
 
 # =========================================================
-# YOUR WATCHLIST
+# WATCHLIST
 # =========================================================
 
 WATCHLIST = [
@@ -81,7 +82,7 @@ WATCHLIST = [
 ]
 
 # =========================================================
-# IMPORTANT MARKET KEYWORDS
+# IMPORTANT KEYWORDS
 # =========================================================
 
 IMPORTANT_KEYWORDS = [
@@ -90,30 +91,67 @@ IMPORTANT_KEYWORDS = [
     "fpi",
     "dii",
     "war",
+    "iran",
+    "russia",
+    "ukraine",
+    "middle east",
     "rbi",
     "fed",
     "nifty",
     "sensex",
     "bank nifty",
     "crude",
+    "oil",
     "inflation",
     "market",
     "stocks",
     "results",
-    "dividend",
-    "order",
-    "india",
-    "railway",
-    "defence",
     "profit",
     "loss",
+    "dividend",
+    "order",
+    "railway",
+    "defence",
     "ipo",
+    "india",
     "tariff",
-    "china",
-    "russia",
-    "ukraine",
-    "middle east",
-    "us market",
+
+]
+
+# =========================================================
+# BLOCKED ARTICLES
+# =========================================================
+
+BLOCKED_WORDS = [
+
+    "buy or sell",
+    "what's fueling",
+    "what is fueling",
+    "target price",
+    "should you buy",
+    "top stocks",
+    "best stocks",
+    "multibagger",
+    "how to",
+    "step-by-step",
+    "ipo allotment",
+    "gmp",
+    "mutual fund",
+    "long term",
+    "brokerage",
+    "recommendation",
+    "technical view",
+    "stock to buy",
+    "expert suggests",
+    "share price target",
+    "check status",
+    "5 stocks",
+    "small-cap stock",
+    "blue-chip stocks",
+    "stocks to watch",
+    "trading idea",
+    "investment strategy",
+
 ]
 
 # =========================================================
@@ -151,11 +189,8 @@ async def send_telegram(message):
         payload = {
 
             "chat_id": CHAT_ID,
-
             "text": message,
-
             "parse_mode": "HTML",
-
             "disable_web_page_preview": True
 
         }
@@ -168,39 +203,74 @@ async def send_telegram(message):
                 timeout=20
             )
 
-            print("Telegram Status:", response.status_code)
+            print("Telegram:", response.status_code)
 
         except Exception as e:
 
             print("Telegram Error:", e)
 
 # =========================================================
-# STRONG DUPLICATE FILTER
+# CLEAN TITLE
+# =========================================================
+
+def clean_title(title):
+
+    title = title.lower()
+
+    remove_words = [
+
+        "live",
+        "latest",
+        "today",
+        "updates",
+        "update",
+        "q1",
+        "q2",
+        "q3",
+        "q4",
+        ":",
+        "-",
+        "|",
+        "?",
+        ",",
+        "share price",
+        "stock price",
+
+    ]
+
+    for word in remove_words:
+
+        title = title.replace(word, "")
+
+    return " ".join(title.split())
+
+# =========================================================
+# ULTRA DUPLICATE FILTER
 # =========================================================
 
 def is_duplicate(title):
 
-    title = title.lower().strip()
+    cleaned = clean_title(title)
 
     for old in SENT_NEWS:
 
-        similarity = fuzz.token_sort_ratio(
-            title,
+        similarity = fuzz.token_set_ratio(
+            cleaned,
             old
         )
 
-        if similarity > 75:
+        if similarity > 65:
             return True
 
-    SENT_NEWS.append(title)
+    SENT_NEWS.append(cleaned)
 
-    if len(SENT_NEWS) > 2000:
+    if len(SENT_NEWS) > 5000:
         SENT_NEWS.pop(0)
 
     return False
 
 # =========================================================
-# SIMPLE SENTIMENT ENGINE
+# SENTIMENT ENGINE
 # =========================================================
 
 def get_sentiment(title):
@@ -214,13 +284,14 @@ def get_sentiment(title):
         "rise",
         "profit",
         "approval",
-        "bullish",
         "growth",
         "strong",
         "high",
         "record",
         "buy",
         "up",
+        "order",
+        "dividend",
 
     ]
 
@@ -253,80 +324,95 @@ def get_sentiment(title):
     return "⚪"
 
 # =========================================================
-# MARKET IMPACT ENGINE
+# MARKET IMPACT
 # =========================================================
 
 def market_impact(title):
 
     title = title.lower()
 
-    impacts = {
+    if "profit" in title or "results" in title:
 
-        "fii":
-        "FII activity may impact overall market sentiment.",
+        return (
+            "Quarterly earnings announced with investors "
+            "closely tracking revenue growth, margins and "
+            "management commentary for future outlook."
+        )
 
-        "fpi":
-        "Foreign investor activity may influence markets.",
+    if "loss" in title:
 
-        "dii":
-        "Domestic institutions remain active in markets.",
+        return (
+            "Weak earnings performance may impact investor "
+            "sentiment and create pressure on the stock."
+        )
 
-        "war":
-        "Global uncertainty may increase market volatility.",
+    if "dividend" in title:
 
-        "rbi":
-        "Banking and financial stocks may stay active.",
+        return (
+            "Dividend announcement may attract interest from "
+            "income-focused and long-term investors."
+        )
 
-        "fed":
-        "US Fed commentary may affect global markets.",
+    if "order" in title:
 
-        "crude":
-        "Oil price movement may impact Indian markets.",
+        return (
+            "New order inflow improves business visibility "
+            "and may support future revenue growth."
+        )
 
-        "inflation":
-        "Inflation concerns may pressure equities.",
+    if "fii" in title or "fpi" in title:
 
-        "railway":
-        "Railway stocks may remain in focus.",
+        return (
+            "Foreign investor activity may influence broader "
+            "market direction and sector sentiment."
+        )
 
-        "defence":
-        "Defence stocks may see buying interest.",
+    if "rbi" in title:
 
-        "order":
-        "Positive order inflow may support stock sentiment.",
+        return (
+            "Banking and financial stocks may remain active "
+            "based on RBI commentary and policy outlook."
+        )
 
-        "results":
-        "Quarterly results may drive stock volatility.",
+    if "war" in title or "iran" in title:
 
-        "profit":
-        "Strong earnings sentiment possible.",
+        return (
+            "Rising geopolitical tensions may increase global "
+            "market volatility and risk-off sentiment."
+        )
 
-        "loss":
-        "Weak earnings sentiment possible.",
+    if "crude" in title or "oil" in title:
 
-        "dividend":
-        "Dividend-related buying interest possible.",
+        return (
+            "Higher crude oil prices may pressure Indian "
+            "markets and oil-sensitive sectors."
+        )
 
-        "nifty":
-        "Index movement may influence broader markets.",
+    if "gold" in title:
 
-        "sensex":
-        "Benchmark indices remain volatile.",
+        return (
+            "Gold-related stocks and ETFs may stay active "
+            "amid safe-haven buying interest."
+        )
 
-        "gold":
-        "Gold-related stocks and ETFs may stay active.",
+    if "silver" in title:
 
-        "silver":
-        "Silver ETFs may remain volatile.",
+        return (
+            "Silver ETFs and metal-related counters may "
+            "remain volatile due to price fluctuations."
+        )
 
-    }
+    if "railway" in title:
 
-    for key, value in impacts.items():
+        return (
+            "Railway sector stocks may stay in focus amid "
+            "continued infrastructure spending."
+        )
 
-        if key in title:
-            return value
-
-    return "Market participants monitoring developments."
+    return (
+        "Market participants are closely monitoring "
+        "developments for potential sector impact."
+    )
 
 # =========================================================
 # MARKET OUTLOOK
@@ -358,16 +444,21 @@ def market_prediction():
         if dow_change > 0.5 and nasdaq_change > 0.5:
 
             return (
-                "🟢 Positive opening expected due to strong global cues."
+                "🟢 Indian markets may open positive supported "
+                "by strong global cues and improved risk sentiment."
             )
 
         elif dow_change < -0.5 or sp_change < -0.5:
 
             return (
-                "🔴 Weak opening possible due to negative global sentiment."
+                "🔴 Weak opening possible due to negative global "
+                "sentiment and cautious investor positioning."
             )
 
-        return "⚪ Flat to volatile opening expected."
+        return (
+            "⚪ Flat to volatile opening expected with traders "
+            "tracking global and domestic triggers."
+        )
 
     except:
 
@@ -402,7 +493,7 @@ def get_change(symbol):
         return "N/A"
 
 # =========================================================
-# WATCHLIST PRIORITY
+# WATCHLIST NEWS
 # =========================================================
 
 def is_watchlist_news(title):
@@ -439,17 +530,22 @@ async def fetch_news():
 
                 title_lower = title.lower()
 
-                important = any(
+                skip_news = any(
                     word in title_lower
-                    for word in IMPORTANT_KEYWORDS
+                    for word in BLOCKED_WORDS
                 )
 
-                priority = (
-                    is_watchlist_news(title)
-                    or important
+                if skip_news:
+                    continue
+
+                important_news = any(
+                    keyword in title_lower
+                    for keyword in IMPORTANT_KEYWORDS
                 )
 
-                if not priority:
+                watchlist_news = is_watchlist_news(title)
+
+                if not important_news and not watchlist_news:
                     continue
 
                 collected_news.append({
@@ -461,7 +557,9 @@ async def fetch_news():
                         "News"
                     ),
 
-                    "priority": priority
+                    "priority": (
+                        watchlist_news or important_news
+                    )
 
                 })
 
@@ -486,14 +584,13 @@ def format_news(title, sentiment, impact, source):
 """
 
 # =========================================================
-# LIVE MARKET NEWS
+# LIVE NEWS
 # =========================================================
 
 async def send_live_news():
 
     now = datetime.now(IST)
 
-    # MARKET HOURS
     if not (8 <= now.hour <= 16):
         return
 
@@ -507,7 +604,7 @@ async def send_live_news():
         reverse=True
     )
 
-    for news in news_list[:6]:
+    for news in news_list[:5]:
 
         title = news["title"]
 
@@ -529,7 +626,7 @@ async def send_live_news():
         await asyncio.sleep(2)
 
 # =========================================================
-# MORNING MARKET BRIEFING
+# MORNING BRIEFING
 # =========================================================
 
 async def morning_briefing():
@@ -590,7 +687,6 @@ async def morning_briefing():
 
 scheduler = AsyncIOScheduler(timezone=IST)
 
-# 7 AM MORNING BRIEFING
 scheduler.add_job(
     morning_briefing,
     "cron",
@@ -598,7 +694,6 @@ scheduler.add_job(
     minute=0
 )
 
-# LIVE NEWS EVERY 1 MINUTE
 scheduler.add_job(
     send_live_news,
     "interval",
