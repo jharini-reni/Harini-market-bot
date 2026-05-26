@@ -1,10 +1,9 @@
 # =========================================================
-# PREMIUM INDIA STOCK MARKET TELEGRAM BOT
+# PREMIUM INDIA MARKET TELEGRAM BOT
+# FINAL PROFESSIONAL VERSION
+# CLEAN FORMAT
 # NO DUPLICATES
-# INDIA NEWS ONLY
-# WATCHLIST PRIORITY
-# MORNING MARKET SETUP
-# LIVE IMPORTANT NEWS
+# INDIA MARKET NEWS ONLY
 # =========================================================
 
 import asyncio
@@ -36,90 +35,59 @@ IST = timezone("Asia/Kolkata")
 
 WATCHLIST = [
 
-    "groww",
-    "sammancap",
-    "iex",
-    "mrpl",
-    "lenskart",
-    "jublfood",
-    "embassy",
-    "lemontree",
-    "canbk",
-    "nivabupa",
-    "kalyankjil",
     "rvnl",
-    "idea",
     "suzlon",
-    "inoxwind",
-    "coalindia",
-    "vedl",
-    "itc",
-    "itchotels",
+    "idea",
+    "yes bank",
+    "ireda",
+    "iex",
     "bel",
-    "redington",
-    "bankbaroda",
+    "itc",
+    "coal india",
+    "vedanta",
+    "canara bank",
+    "bank of baroda",
     "pnb",
     "wipro",
-    "hyundai",
-    "geojitfsl",
-    "ireda",
     "tatatech",
-    "yesbank",
-    "eternal",
-    "thangamayil",
-    "idfcfirstbk",
+    "ola electric",
     "hfcl",
     "texrail",
-    "olaelec",
-    "ather",
-    "goldbees",
-    "silverbees",
-    "gold",
-    "silver",
-    "suntv"
+    "inox wind",
+    "mrpl",
+    "jublfood"
 
 ]
 
 # =========================================================
-# IMPORTANT MARKET KEYWORDS
+# IMPORTANT KEYWORDS
 # =========================================================
 
 IMPORTANT_KEYWORDS = [
-
-    "nifty",
-    "sensex",
-    "bank nifty",
-    "gift nifty",
-
-    "fii",
-    "fpi",
-    "dii",
-
-    "rbi",
-    "inflation",
-    "repo rate",
-    "fed",
-
-    "crude",
-    "oil",
-    "gold",
-    "silver",
-
-    "iran",
-    "war",
-    "ukraine",
-    "middle east",
 
     "results",
     "profit",
     "loss",
     "dividend",
     "order",
-    "stake",
-    "deal",
-    "approval",
-    "merger",
-    "acquisition",
+    "stake sale",
+    "block deal",
+    "fii",
+    "fpi",
+    "dii",
+    "rbi",
+    "nifty",
+    "sensex",
+    "bank nifty",
+    "crude",
+    "oil",
+    "gold",
+    "silver",
+    "war",
+    "iran",
+    "middle east",
+    "inflation",
+    "fed"
 
 ]
 
@@ -135,19 +103,18 @@ BLOCKED_WORDS = [
     "top stocks",
     "best stocks",
     "multibagger",
-    "how to",
-    "step-by-step",
-    "ipo allotment",
-    "gmp",
-    "mutual fund",
     "brokerage",
     "technical view",
+    "recommendation",
     "stock to buy",
     "expert suggests",
     "share price target",
     "investment strategy",
     "what's fueling",
     "what is fueling",
+    "gmp",
+    "ipo allotment",
+    "mutual fund",
 
 ]
 
@@ -157,23 +124,20 @@ BLOCKED_WORDS = [
 
 BLOCKED_NEWS = [
 
-    "bts",
-    "celebrity",
     "football",
     "cricket",
     "hollywood",
+    "celebrity",
     "movie",
-    "music awards",
-    "gene therapy",
-    "eli lilly",
-    "meta",
-    "ai datacentre",
+    "music",
     "entertainment",
+    "bts",
+    "gene therapy",
 
 ]
 
 # =========================================================
-# TRUSTED INDIA MARKET SOURCES
+# RSS FEEDS
 # =========================================================
 
 RSS_FEEDS = [
@@ -208,7 +172,7 @@ async def send_telegram(message):
 
             "chat_id": CHAT_ID,
             "text": message,
-            "parse_mode": "HTML",
+            "parse_mode": "Markdown",
             "disable_web_page_preview": True
 
         }
@@ -237,8 +201,8 @@ def clean_title(title):
 
     remove_words = [
 
-        "live",
         "latest",
+        "live",
         "today",
         "update",
         "updates",
@@ -248,9 +212,7 @@ def clean_title(title):
         "q4",
         ":",
         "-",
-        "|",
-        "?",
-        ",",
+        "|"
 
     ]
 
@@ -316,10 +278,9 @@ def get_sentiment(title):
         "gain",
         "approval",
         "growth",
-        "strong",
         "high",
         "order",
-        "dividend",
+        "dividend"
 
     ]
 
@@ -332,7 +293,7 @@ def get_sentiment(title):
         "weak",
         "crash",
         "decline",
-        "sell",
+        "sell"
 
     ]
 
@@ -359,15 +320,15 @@ def market_impact(title):
     if "results" in title or "profit" in title:
 
         return (
-            "Company announced quarterly earnings with "
-            "investors closely tracking profit growth, "
-            "revenue performance and future outlook."
+            "Company reported quarterly earnings with "
+            "investors tracking margins, revenue growth "
+            "and future business outlook closely."
         )
 
     if "loss" in title:
 
         return (
-            "Weak financial performance may impact "
+            "Weak earnings performance may impact "
             "investor sentiment and stock movement."
         )
 
@@ -381,8 +342,8 @@ def market_impact(title):
     if "order" in title:
 
         return (
-            "Fresh order inflow improves business "
-            "visibility and future revenue expectations."
+            "Fresh order inflow improves revenue "
+            "visibility and future growth expectations."
         )
 
     if "fii" in title or "fpi" in title:
@@ -396,14 +357,14 @@ def market_impact(title):
 
         return (
             "Banking and financial stocks may remain "
-            "active based on RBI commentary."
+            "active after RBI commentary."
         )
 
     if "war" in title or "iran" in title:
 
         return (
-            "Geopolitical tensions may increase global "
-            "market volatility and cautious sentiment."
+            "Global tensions may increase market "
+            "volatility and cautious sentiment."
         )
 
     if "crude" in title or "oil" in title:
@@ -413,27 +374,131 @@ def market_impact(title):
             "Indian markets and oil-sensitive sectors."
         )
 
-    if "gold" in title:
-
-        return (
-            "Gold-related stocks and ETFs may stay "
-            "active amid safe-haven buying."
-        )
-
-    if "silver" in title:
-
-        return (
-            "Silver ETFs may remain volatile due "
-            "to metal price fluctuations."
-        )
-
     return (
         "Market participants are closely monitoring "
         "developments for sector impact."
     )
 
 # =========================================================
-# INDEX CHANGE
+# FETCH NEWS
+# =========================================================
+
+async def fetch_news():
+
+    collected_news = []
+
+    for url in RSS_FEEDS:
+
+        try:
+
+            feed = feedparser.parse(url)
+
+            for entry in feed.entries[:20]:
+
+                title = entry.title.strip()
+
+                title_lower = title.lower()
+
+                if is_duplicate(title):
+                    continue
+
+                skip_article = any(
+                    word in title_lower
+                    for word in BLOCKED_WORDS
+                )
+
+                if skip_article:
+                    continue
+
+                skip_random = any(
+                    word in title_lower
+                    for word in BLOCKED_NEWS
+                )
+
+                if skip_random:
+                    continue
+
+                important = any(
+                    keyword in title_lower
+                    for keyword in IMPORTANT_KEYWORDS
+                )
+
+                watchlist = is_watchlist_news(title)
+
+                if not important and not watchlist:
+                    continue
+
+                collected_news.append({
+
+                    "title": title,
+
+                    "source": feed.feed.get(
+                        "title",
+                        "News"
+                    )
+
+                })
+
+        except Exception as e:
+
+            print("RSS Error:", e)
+
+    return collected_news
+
+# =========================================================
+# FORMAT NEWS
+# =========================================================
+
+def format_news(title, sentiment, impact, source):
+
+    return f"""
+{sentiment} *{title}*
+
+📌 {impact}
+
+📰 Source: {source}
+
+──────────────────────────────
+"""
+
+# =========================================================
+# LIVE MARKET NEWS
+# =========================================================
+
+async def send_live_news():
+
+    now = datetime.now(IST)
+
+    if not (7 <= now.hour <= 23):
+        return
+
+    print("Checking News...")
+
+    news_list = await fetch_news()
+
+    for news in news_list[:5]:
+
+        title = news["title"]
+
+        sentiment = get_sentiment(title)
+
+        impact = market_impact(title)
+
+        source = news["source"]
+
+        message = format_news(
+            title,
+            sentiment,
+            impact,
+            source
+        )
+
+        await send_telegram(message)
+
+        await asyncio.sleep(2)
+
+# =========================================================
+# MORNING MARKET BRIEFING
 # =========================================================
 
 def get_change(symbol):
@@ -462,183 +527,6 @@ def get_change(symbol):
         return "N/A"
 
 # =========================================================
-# MARKET OUTLOOK
-# =========================================================
-
-def market_prediction():
-
-    try:
-
-        dow = yf.Ticker("^DJI").history(period="2d")
-
-        nasdaq = yf.Ticker("^IXIC").history(period="2d")
-
-        dow_change = (
-            (dow["Close"].iloc[-1] - dow["Close"].iloc[-2])
-            / dow["Close"].iloc[-2]
-        ) * 100
-
-        nasdaq_change = (
-            (nasdaq["Close"].iloc[-1] - nasdaq["Close"].iloc[-2])
-            / nasdaq["Close"].iloc[-2]
-        ) * 100
-
-        if dow_change > 0.5 and nasdaq_change > 0.5:
-
-            return (
-                "🟢 Positive global cues may support "
-                "a stronger Indian market opening."
-            )
-
-        elif dow_change < -0.5:
-
-            return (
-                "🔴 Weak global sentiment may keep "
-                "Indian markets under pressure."
-            )
-
-        return (
-            "⚪ Flat to volatile opening expected "
-            "with focus on global cues."
-        )
-
-    except:
-
-        return "⚪ Market outlook unavailable."
-
-# =========================================================
-# FETCH NEWS
-# =========================================================
-
-async def fetch_news():
-
-    collected_news = []
-
-    for url in RSS_FEEDS:
-
-        try:
-
-            feed = feedparser.parse(url)
-
-            for entry in feed.entries[:20]:
-
-                title = entry.title.strip()
-
-                if is_duplicate(title):
-                    continue
-
-                title_lower = title.lower()
-
-                skip_article = any(
-                    word in title_lower
-                    for word in BLOCKED_WORDS
-                )
-
-                if skip_article:
-                    continue
-
-                skip_random_news = any(
-                    word in title_lower
-                    for word in BLOCKED_NEWS
-                )
-
-                if skip_random_news:
-                    continue
-
-                important_news = any(
-                    keyword in title_lower
-                    for keyword in IMPORTANT_KEYWORDS
-                )
-
-                watchlist_news = is_watchlist_news(title)
-
-                if not important_news and not watchlist_news:
-                    continue
-
-                collected_news.append({
-
-                    "title": title,
-
-                    "source": feed.feed.get(
-                        "title",
-                        "News"
-                    ),
-
-                    "priority": (
-                        watchlist_news or important_news
-                    )
-
-                })
-
-        except Exception as e:
-
-            print("RSS Error:", e)
-
-    return collected_news
-
-# =========================================================
-# FORMAT NEWS
-# =========================================================
-
-def format_news(title, sentiment, impact, source):
-
-    return f"""
-{sentiment} <b>{title}</b>
-
-📌 {impact}
-
-📰 {source}
-
-━━━━━━━━━━━━━━━
-"""
-
-# =========================================================
-# LIVE MARKET NEWS
-# =========================================================
-
-async def send_live_news():
-
-    now = datetime.now(IST)
-
-    # MARKET HOURS ONLY
-
-    if not (7 <= now.hour <= 23):
-        return
-
-    print("Checking News...")
-
-    news_list = await fetch_news()
-
-    news_list = sorted(
-        news_list,
-        key=lambda x: x["priority"],
-        reverse=True
-    )
-
-    for news in news_list[:5]:
-
-        title = news["title"]
-
-        sentiment = get_sentiment(title)
-
-        impact = market_impact(title)
-
-        source = news["source"]
-
-        message = format_news(
-            title,
-            sentiment,
-            impact,
-            source
-        )
-
-        await send_telegram(message)
-
-        await asyncio.sleep(2)
-
-# =========================================================
-# MORNING MARKET BRIEFING
-# =========================================================
 
 async def morning_briefing():
 
@@ -652,58 +540,60 @@ async def morning_briefing():
 
     nifty = get_change("^NSEI")
 
-    outlook = market_prediction()
+    banknifty = get_change("^NSEBANK")
 
     msg = f"""
-🌅 <b>MORNING MARKET SETUP</b>
+🌅 *MORNING MARKET BRIEFING*
+*{today} | 7:00 AM IST*
 
-📅 {today}
+──────────────────────────────
 
-━━━━━━━━━━━━━━━
-
-📊 <b>GLOBAL MARKETS</b>
+📊 *GLOBAL MARKETS*
 
 ▪ Dow Jones : {dow}
-
 ▪ Nasdaq : {nasdaq}
-
 ▪ S&P 500 : {sp500}
 
-━━━━━━━━━━━━━━━
+──────────────────────────────
 
-🇮🇳 <b>NIFTY OUTLOOK</b>
+🇮🇳 *INDIAN MARKET SETUP*
 
-▪ Nifty : {nifty}
+▪ Nifty 50 : {nifty}
+▪ Bank Nifty : {banknifty}
 
-📌 {outlook}
+📌 Global cues indicate cautious to volatile market opening with investors tracking crude oil prices, FII activity and RBI commentary closely.
 
-━━━━━━━━━━━━━━━
+──────────────────────────────
 
-🔥 <b>WATCHLIST IN FOCUS</b>
+🔥 *WATCHLIST STOCKS IN FOCUS*
 
-🟢 RVNL
-🟢 SUZLON
-🟢 BEL
-🟢 IREDA
-🟢 YES BANK
-🟢 IEX
-🔴 ITC
+🟢 RVNL – Railway stocks remain active
 
-━━━━━━━━━━━━━━━
+🟢 SUZLON – Renewable energy theme strong
 
-⚠️ <b>KEY MARKET TRIGGERS</b>
+🟢 BEL – Defence sector momentum continues
+
+🟢 IREDA – Green energy stocks in focus
+
+🟢 YES BANK – Banking sector active
+
+🔴 ITC – FMCG sector may remain volatile
+
+──────────────────────────────
+
+⚠️ *KEY MARKET TRIGGERS*
 
 ▪ FII / DII Activity
 
-▪ RBI Commentary
-
-▪ Crude Oil Prices
-
 ▪ Corporate Results
 
-▪ Global Market Cues
+▪ Crude Oil Movement
 
-━━━━━━━━━━━━━━━
+▪ RBI & Global Cues
+
+▪ War / Geopolitical Updates
+
+──────────────────────────────
 """
 
     await send_telegram(msg)
@@ -714,16 +604,12 @@ async def morning_briefing():
 
 scheduler = AsyncIOScheduler(timezone=IST)
 
-# MORNING 7 AM MESSAGE
-
 scheduler.add_job(
     morning_briefing,
     "cron",
     hour=7,
     minute=0
 )
-
-# LIVE NEWS EVERY 1 MINUTE
 
 scheduler.add_job(
     send_live_news,
