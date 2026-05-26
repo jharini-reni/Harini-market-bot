@@ -1,7 +1,8 @@
 # =========================================================
 # AI TELEGRAM STOCK MARKET BOT
-# FINAL STABLE VERSION
-# NO SPAM STARTUP MESSAGE
+# FINAL PRODUCTION VERSION
+# NO DUPLICATES
+# LIVE NEWS EVERY 1 MINUTE
 # RENDER FREE PLAN READY
 # =========================================================
 
@@ -28,7 +29,7 @@ TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 IST = timezone("Asia/Kolkata")
 
 # =========================================================
-# WATCHLIST
+# YOUR WATCHLIST
 # =========================================================
 
 WATCHLIST = [
@@ -80,10 +81,15 @@ WATCHLIST = [
 # =========================================================
 
 RSS_FEEDS = [
+
     "https://www.moneycontrol.com/rss/business.xml",
+
     "https://www.livemint.com/rss/markets",
+
     "https://feeds.feedburner.com/ndtvprofit-latest",
+
     "https://www.cnbctv18.com/commonfeeds/v1/eng/rss/business.xml",
+
 ]
 
 # =========================================================
@@ -122,24 +128,27 @@ async def send_telegram(message):
             print("Telegram Error:", e)
 
 # =========================================================
-# DUPLICATE FILTER
+# STRONG DUPLICATE FILTER
 # =========================================================
 
 def is_duplicate(title):
 
+    title = title.lower().strip()
+
     for old in SENT_NEWS:
 
-        similarity = fuzz.ratio(
-            title.lower(),
-            old.lower()
+        similarity = fuzz.token_sort_ratio(
+            title,
+            old
         )
 
-        if similarity > 85:
+        if similarity > 75:
             return True
 
     SENT_NEWS.append(title)
 
-    if len(SENT_NEWS) > 1000:
+    # MEMORY LIMIT
+    if len(SENT_NEWS) > 2000:
         SENT_NEWS.pop(0)
 
     return False
@@ -153,6 +162,7 @@ def get_sentiment(title):
     title = title.lower()
 
     positive_words = [
+
         "surge",
         "gain",
         "rise",
@@ -161,9 +171,13 @@ def get_sentiment(title):
         "approval",
         "bullish",
         "growth",
+        "strong",
+        "record",
+        "high",
     ]
 
     negative_words = [
+
         "fall",
         "decline",
         "loss",
@@ -172,6 +186,8 @@ def get_sentiment(title):
         "weak",
         "drop",
         "bearish",
+        "low",
+        "cuts",
     ]
 
     for word in positive_words:
@@ -187,7 +203,7 @@ def get_sentiment(title):
     return "⚪"
 
 # =========================================================
-# MARKET IMPACT
+# MARKET IMPACT ENGINE
 # =========================================================
 
 def market_impact(title):
@@ -228,6 +244,12 @@ def market_impact(title):
 
         "results":
         "Stock-specific volatility expected.",
+
+        "profit":
+        "Positive earnings sentiment possible.",
+
+        "loss":
+        "Negative sentiment may affect the stock.",
     }
 
     for key, reason in rules.items():
@@ -279,7 +301,7 @@ def market_prediction():
         return "⚪ Market outlook unavailable."
 
 # =========================================================
-# INDEX CHANGE
+# GET INDEX CHANGE
 # =========================================================
 
 def get_change(symbol):
@@ -337,7 +359,7 @@ async def fetch_news():
 
             for entry in feed.entries[:10]:
 
-                title = entry.title
+                title = entry.title.strip()
 
                 if is_duplicate(title):
                     continue
@@ -386,6 +408,7 @@ async def send_live_news():
 
     news_list = await fetch_news()
 
+    # WATCHLIST PRIORITY
     news_list = sorted(
         news_list,
         key=lambda x: x["priority"],
@@ -411,7 +434,7 @@ async def send_live_news():
 
         await send_telegram(message)
 
-        await asyncio.sleep(3)
+        await asyncio.sleep(2)
 
 # =========================================================
 # MORNING MARKET BRIEFING
@@ -446,12 +469,14 @@ async def morning_briefing():
 
 {outlook}
 
-🔥 <b>STOCKS IN FOCUS</b>
+🔥 <b>WATCHLIST STOCKS</b>
 
 🟢 RVNL
 🟢 BEL
 🟢 SUZLON
 🟢 IREDA
+🟢 YES BANK
+🟢 IEX
 🔴 ITC
 
 ⚠️ <b>KEY MARKET TRIGGERS</b>
@@ -472,7 +497,7 @@ async def morning_briefing():
 
 scheduler = AsyncIOScheduler(timezone=IST)
 
-# 7 AM MORNING BRIEFING
+# MORNING BRIEFING - 7 AM
 scheduler.add_job(
     morning_briefing,
     "cron",
@@ -480,11 +505,11 @@ scheduler.add_job(
     minute=0
 )
 
-# LIVE MARKET NEWS EVERY 5 MINUTES
+# LIVE NEWS EVERY 1 MINUTE
 scheduler.add_job(
     send_live_news,
     "interval",
-    minutes=5
+    minutes=1
 )
 
 scheduler.start()
