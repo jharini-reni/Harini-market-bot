@@ -1,628 +1,210 @@
-# =========================================================
-# PREMIUM INDIA MARKET TELEGRAM BOT
-# FINAL PROFESSIONAL VERSION
-# CLEAN FORMAT
-# NO DUPLICATES
-# INDIA MARKET NEWS ONLY
-# =========================================================
-
+import os
 import asyncio
 import httpx
-import feedparser
-import yfinance as yf
-
 from datetime import datetime
-from pytz import timezone
-
-from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from rapidfuzz import fuzz
-
-# =========================================================
-# TELEGRAM CONFIG
-# =========================================================
+import pytz
+import schedule
+import time
+import yfinance as yf
+import hashlib
 
 BOT_TOKEN = "8920822727:AAEoeYvwnNrIU58ODEJVGCCLiHy1wSa-VAc"
-
 CHAT_ID = "1212371388"
-
 TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+IST = pytz.timezone("Asia/Kolkata")
+NEWS_API_KEY = os.getenv("NEWS_API_KEY", "")
 
-IST = timezone("Asia/Kolkata")
+# Duplicate prevention - store sent news IDs
+SENT_IDS = set()
 
-# =========================================================
-# WATCHLIST
-# =========================================================
-
-WATCHLIST = [
-
-    "rvnl",
-    "suzlon",
-    "idea",
-    "yes bank",
-    "ireda",
-    "iex",
-    "bel",
-    "itc",
-    "coal india",
-    "vedanta",
-    "canara bank",
-    "bank of baroda",
-    "pnb",
-    "wipro",
-    "tatatech",
-    "ola electric",
-    "hfcl",
-    "texrail",
-    "inox wind",
-    "mrpl",
-    "jublfood"
-
+STOCKS = [
+    "Jubilant FoodWorks", "Indian Energy Exchange", "MRPL", "Canara Bank",
+    "Niva Bupa", "Kalyan Jewellers", "RVNL", "Vodafone Idea", "Suzlon Energy",
+    "Inox Wind", "Coal India", "Vedanta", "ITC", "ITC Hotels", "Diamond Cables",
+    "BEL", "Redington", "Bank of Baroda", "Punjab National Bank", "Wipro",
+    "Hyundai India", "IREDA", "Tata Technologies", "Yes Bank", "IDFC First Bank",
+    "Ola Electric", "Ather Energy", "Thangamayil Jewellery", "Geojit Financial",
+    "GoldBees", "SilverBees", "Gold ETF", "Silver ETF",
+    "LG India", "Groww", "Lenskart", "Samman Capital"
 ]
 
-# =========================================================
-# IMPORTANT KEYWORDS
-# =========================================================
+NSE_SYMBOLS = {
+    "JUBLFOOD": "JUBLFOOD.NS", "IEX": "IEX.NS", "MRPL": "MRPL.NS",
+    "CANBK": "CANBK.NS", "KALYANKJIL": "KALYANKJIL.NS", "RVNL": "RVNL.NS",
+    "IDEA": "IDEA.NS", "SUZLON": "SUZLON.NS", "INOXWIND": "INOXWIND.NS",
+    "COALINDIA": "COALINDIA.NS", "VEDL": "VEDL.NS", "ITC": "ITC.NS",
+    "BEL": "BEL.NS", "BANKBARODA": "BANKBARODA.NS", "PNB": "PNB.NS",
+    "WIPRO": "WIPRO.NS", "IREDA": "IREDA.NS", "TATATECH": "TATATECH.NS",
+    "YESBANK": "YESBANK.NS", "IDFCFIRSTB": "IDFCFIRSTB.NS",
+    "OLAELEC": "OLAELEC.NS", "GOLDBEES": "GOLDBEES.NS",
+    "SILVERBEES": "SILVERBEES.NS", "THANGAMAYIL": "THANGAMAYIL.NS",
+    "NIFTY50": "^NSEI", "BANKNIFTY": "^NSEBANK", "MIDCAP": "^NSEMDCP50",
+    "GOLD": "GC=F", "SILVER": "SI=F",
+}
 
-IMPORTANT_KEYWORDS = [
-
-    "results",
-    "profit",
-    "loss",
-    "dividend",
-    "order",
-    "stake sale",
-    "block deal",
-    "fii",
-    "fpi",
-    "dii",
-    "rbi",
-    "nifty",
-    "sensex",
-    "bank nifty",
-    "crude",
-    "oil",
-    "gold",
-    "silver",
-    "war",
-    "iran",
-    "middle east",
-    "inflation",
-    "fed"
-
+NEWS_TOPICS = [
+    ("Indian stock market NSE BSE", "🇮🇳 INDIA MARKET"),
+    ("RBI policy economy India", "🏦 RBI / ECONOMY"),
+    ("Trump trade war global market", "🌍 GLOBAL NEWS"),
+    ("Gold Silver price India", "🥇 GOLD & SILVER"),
+    ("Nifty Bank Nifty sensex today", "📊 INDICES"),
+    ("Suzlon Ola Electric Ather Energy news", "⚡ YOUR STOCKS"),
+    ("Yes Bank IDFC Canara Bank news", "🏦 BANKING STOCKS"),
+    ("Coal India Vedanta ITC news", "🏭 PSU & FMCG"),
+    ("Modi economy policy India", "🇮🇳 INDIA POLICY"),
+    ("war Ukraine Russia China market impact", "⚔️ GEOPOLITICAL"),
 ]
 
-# =========================================================
-# REMOVE RECOMMENDATION ARTICLES
-# =========================================================
 
-BLOCKED_WORDS = [
-
-    "buy or sell",
-    "target price",
-    "should you buy",
-    "top stocks",
-    "best stocks",
-    "multibagger",
-    "brokerage",
-    "technical view",
-    "recommendation",
-    "stock to buy",
-    "expert suggests",
-    "share price target",
-    "investment strategy",
-    "what's fueling",
-    "what is fueling",
-    "gmp",
-    "ipo allotment",
-    "mutual fund",
-
-]
-
-# =========================================================
-# REMOVE RANDOM NEWS
-# =========================================================
-
-BLOCKED_NEWS = [
-
-    "football",
-    "cricket",
-    "hollywood",
-    "celebrity",
-    "movie",
-    "music",
-    "entertainment",
-    "bts",
-    "gene therapy",
-
-]
-
-# =========================================================
-# RSS FEEDS
-# =========================================================
-
-RSS_FEEDS = [
-
-    "https://www.moneycontrol.com/rss/business.xml",
-
-    "https://www.moneycontrol.com/rss/MCtopnews.xml",
-
-    "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
-
-    "https://feeds.feedburner.com/ndtvprofit-latest",
-
-    "https://www.cnbctv18.com/commonfeeds/v1/eng/rss/business.xml",
-
-]
-
-# =========================================================
-# STORAGE
-# =========================================================
-
-SENT_NEWS = []
-
-# =========================================================
-# TELEGRAM SEND
-# =========================================================
-
-async def send_telegram(message):
-
+async def send_telegram(message: str):
     async with httpx.AsyncClient() as client:
-
         payload = {
-
             "chat_id": CHAT_ID,
             "text": message,
-            "parse_mode": "Markdown",
-            "disable_web_page_preview": True
-
+            "parse_mode": "HTML",
+            "disable_web_page_preview": True,
         }
-
         try:
-
-            await client.post(
-                TELEGRAM_URL,
-                json=payload,
-                timeout=20
-            )
-
-            print("Message Sent")
-
+            await client.post(TELEGRAM_URL, json=payload, timeout=10)
+            await asyncio.sleep(0.5)  # Avoid telegram rate limit
         except Exception as e:
-
-            print("Telegram Error:", e)
-
-# =========================================================
-# CLEAN TITLE
-# =========================================================
-
-def clean_title(title):
-
-    title = title.lower()
-
-    remove_words = [
-
-        "latest",
-        "live",
-        "today",
-        "update",
-        "updates",
-        "q1",
-        "q2",
-        "q3",
-        "q4",
-        ":",
-        "-",
-        "|"
-
-    ]
-
-    for word in remove_words:
-
-        title = title.replace(word, "")
-
-    return " ".join(title.split())
-
-# =========================================================
-# DUPLICATE FILTER
-# =========================================================
-
-def is_duplicate(title):
-
-    cleaned = clean_title(title)
-
-    for old in SENT_NEWS:
-
-        similarity = fuzz.token_set_ratio(
-            cleaned,
-            old
-        )
-
-        if similarity > 65:
-            return True
-
-    SENT_NEWS.append(cleaned)
-
-    if len(SENT_NEWS) > 5000:
-        SENT_NEWS.pop(0)
-
-    return False
-
-# =========================================================
-# WATCHLIST CHECK
-# =========================================================
-
-def is_watchlist_news(title):
-
-    title = title.lower()
-
-    for stock in WATCHLIST:
-
-        if stock in title:
-            return True
-
-    return False
-
-# =========================================================
-# SENTIMENT
-# =========================================================
-
-def get_sentiment(title):
-
-    title = title.lower()
-
-    positive_words = [
-
-        "profit",
-        "surge",
-        "rise",
-        "gain",
-        "approval",
-        "growth",
-        "high",
-        "order",
-        "dividend"
-
-    ]
-
-    negative_words = [
-
-        "loss",
-        "fall",
-        "drop",
-        "war",
-        "weak",
-        "crash",
-        "decline",
-        "sell"
-
-    ]
-
-    for word in positive_words:
-
-        if word in title:
-            return "🟢"
-
-    for word in negative_words:
-
-        if word in title:
-            return "🔴"
-
-    return "⚪"
-
-# =========================================================
-# SMART MARKET IMPACT
-# =========================================================
-
-def market_impact(title):
-
-    title = title.lower()
-
-    if "results" in title or "profit" in title:
-
-        return (
-            "Company reported quarterly earnings with "
-            "investors tracking margins, revenue growth "
-            "and future business outlook closely."
-        )
-
-    if "loss" in title:
-
-        return (
-            "Weak earnings performance may impact "
-            "investor sentiment and stock movement."
-        )
-
-    if "dividend" in title:
-
-        return (
-            "Dividend announcement may attract "
-            "long-term and income-focused investors."
-        )
-
-    if "order" in title:
-
-        return (
-            "Fresh order inflow improves revenue "
-            "visibility and future growth expectations."
-        )
-
-    if "fii" in title or "fpi" in title:
-
-        return (
-            "Foreign investor activity may influence "
-            "overall market direction and volatility."
-        )
-
-    if "rbi" in title:
-
-        return (
-            "Banking and financial stocks may remain "
-            "active after RBI commentary."
-        )
-
-    if "war" in title or "iran" in title:
-
-        return (
-            "Global tensions may increase market "
-            "volatility and cautious sentiment."
-        )
-
-    if "crude" in title or "oil" in title:
-
-        return (
-            "Higher crude oil prices may pressure "
-            "Indian markets and oil-sensitive sectors."
-        )
-
-    return (
-        "Market participants are closely monitoring "
-        "developments for sector impact."
-    )
-
-# =========================================================
-# FETCH NEWS
-# =========================================================
-
-async def fetch_news():
-
-    collected_news = []
-
-    for url in RSS_FEEDS:
-
-        try:
-
-            feed = feedparser.parse(url)
-
-            for entry in feed.entries[:20]:
-
-                title = entry.title.strip()
-
-                title_lower = title.lower()
-
-                if is_duplicate(title):
-                    continue
-
-                skip_article = any(
-                    word in title_lower
-                    for word in BLOCKED_WORDS
-                )
-
-                if skip_article:
-                    continue
-
-                skip_random = any(
-                    word in title_lower
-                    for word in BLOCKED_NEWS
-                )
-
-                if skip_random:
-                    continue
-
-                important = any(
-                    keyword in title_lower
-                    for keyword in IMPORTANT_KEYWORDS
-                )
-
-                watchlist = is_watchlist_news(title)
-
-                if not important and not watchlist:
-                    continue
-
-                collected_news.append({
-
-                    "title": title,
-
-                    "source": feed.feed.get(
-                        "title",
-                        "News"
-                    )
-
-                })
-
-        except Exception as e:
-
-            print("RSS Error:", e)
-
-    return collected_news
-
-# =========================================================
-# FORMAT NEWS
-# =========================================================
-
-def format_news(title, sentiment, impact, source):
-
-    return f"""
-{sentiment} *{title}*
-
-📌 {impact}
-
-📰 Source: {source}
-
-──────────────────────────────
-"""
-
-# =========================================================
-# LIVE MARKET NEWS
-# =========================================================
-
-async def send_live_news():
-
-    now = datetime.now(IST)
-
-    if not (7 <= now.hour <= 23):
-        return
-
-    print("Checking News...")
-
-    news_list = await fetch_news()
-
-    for news in news_list[:5]:
-
-        title = news["title"]
-
-        sentiment = get_sentiment(title)
-
-        impact = market_impact(title)
-
-        source = news["source"]
-
-        message = format_news(
-            title,
-            sentiment,
-            impact,
-            source
-        )
-
-        await send_telegram(message)
-
-        await asyncio.sleep(2)
-
-# =========================================================
-# MORNING MARKET BRIEFING
-# =========================================================
-
-def get_change(symbol):
-
+            print(f"Telegram error: {e}")
+
+
+def get_news_id(title: str) -> str:
+    return hashlib.md5(title.encode()).hexdigest()
+
+
+async def fetch_news(query: str, count: int = 3) -> list:
+    if not NEWS_API_KEY:
+        return []
+    url = "https://newsapi.org/v2/everything"
+    params = {
+        "q": query,
+        "language": "en",
+        "sortBy": "publishedAt",
+        "pageSize": count,
+        "apiKey": NEWS_API_KEY,
+    }
     try:
-
-        ticker = yf.Ticker(symbol)
-
-        hist = ticker.history(period="2d")
-
-        prev_close = hist["Close"].iloc[-2]
-
-        current = hist["Close"].iloc[-1]
-
-        change = (
-            (current - prev_close)
-            / prev_close
-        ) * 100
-
-        emoji = "🟢" if change > 0 else "🔴"
-
-        return f"{emoji} {change:+.2f}%"
-
+        async with httpx.AsyncClient() as client:
+            r = await client.get(url, params=params, timeout=10)
+            data = r.json()
+            return data.get("articles", [])
     except:
+        return []
 
+
+def get_price(symbol_key: str) -> str:
+    yf_sym = NSE_SYMBOLS.get(symbol_key)
+    if not yf_sym:
+        return "N/A"
+    try:
+        ticker = yf.Ticker(yf_sym)
+        hist = ticker.history(period="1d", interval="5m")
+        if hist.empty:
+            return "N/A"
+        price = hist["Close"].iloc[-1]
+        open_price = hist["Open"].iloc[0]
+        change = price - open_price
+        pct = (change / open_price) * 100
+        arrow = "🟢" if change >= 0 else "🔴"
+        return f"{arrow} ₹{price:.2f} ({pct:+.2f}%)"
+    except:
         return "N/A"
 
-# =========================================================
+
+async def send_live_news():
+    """Runs every 10 mins — sends only NEW news, no duplicates"""
+    global SENT_IDS
+    found_any = False
+
+    for query, label in NEWS_TOPICS:
+        articles = await fetch_news(query, 3)
+        new_articles = []
+
+        for a in articles:
+            news_id = get_news_id(a.get("title", ""))
+            if news_id not in SENT_IDS:
+                SENT_IDS.add(news_id)
+                new_articles.append(a)
+
+        if new_articles:
+            found_any = True
+            now = datetime.now(IST).strftime("%I:%M %p")
+            msg = f"<b>{label} | {now} IST</b>\n{'─'*25}\n\n"
+            for a in new_articles:
+                title = a.get("title", "")
+                source = a.get("source", {}).get("name", "Unknown")
+                url = a.get("url", "")
+                published = a.get("publishedAt", "")[:10]
+                msg += f"▪{title}\n🔗 {source} | {published}\n{url}\n\n"
+            await send_telegram(msg)
+
+    # Keep SENT_IDS from growing too large
+    if len(SENT_IDS) > 1000:
+        SENT_IDS = set(list(SENT_IDS)[-500:])
+
 
 async def morning_briefing():
+    """7 AM full briefing"""
+    now = datetime.now(IST).strftime("%d %b %Y")
+    msg = f"🌅 <b>MORNING MARKET BRIEFING</b>\n<b>{now} | 7:00 AM IST</b>\n{'─'*25}\n\n"
 
-    today = datetime.now(IST).strftime("%d %b %Y")
+    # Indices
+    msg += "<b>📊 KEY INDICES</b>\n"
+    for name, key in [("Nifty 50", "NIFTY50"), ("Bank Nifty", "BANKNIFTY"), ("Midcap 50", "MIDCAP")]:
+        msg += f"▪{name}: {get_price(key)}\n"
 
-    dow = get_change("^DJI")
+    # Commodities
+    msg += "\n<b>🪙 GOLD & SILVER</b>\n"
+    msg += f"▪Gold: {get_price('GOLD')}\n"
+    msg += f"▪Silver: {get_price('SILVER')}\n"
 
-    nasdaq = get_change("^IXIC")
-
-    sp500 = get_change("^GSPC")
-
-    nifty = get_change("^NSEI")
-
-    banknifty = get_change("^NSEBANK")
-
-    msg = f"""
-🌅 *MORNING MARKET BRIEFING*
-*{today} | 7:00 AM IST*
-
-──────────────────────────────
-
-📊 *GLOBAL MARKETS*
-
-▪ Dow Jones : {dow}
-▪ Nasdaq : {nasdaq}
-▪ S&P 500 : {sp500}
-
-──────────────────────────────
-
-🇮🇳 *INDIAN MARKET SETUP*
-
-▪ Nifty 50 : {nifty}
-▪ Bank Nifty : {banknifty}
-
-📌 Global cues indicate cautious to volatile market opening with investors tracking crude oil prices, FII activity and RBI commentary closely.
-
-──────────────────────────────
-
-🔥 *WATCHLIST STOCKS IN FOCUS*
-
-🟢 RVNL – Railway stocks remain active
-
-🟢 SUZLON – Renewable energy theme strong
-
-🟢 BEL – Defence sector momentum continues
-
-🟢 IREDA – Green energy stocks in focus
-
-🟢 YES BANK – Banking sector active
-
-🔴 ITC – FMCG sector may remain volatile
-
-──────────────────────────────
-
-⚠️ *KEY MARKET TRIGGERS*
-
-▪ FII / DII Activity
-
-▪ Corporate Results
-
-▪ Crude Oil Movement
-
-▪ RBI & Global Cues
-
-▪ War / Geopolitical Updates
-
-──────────────────────────────
-"""
+    # Focus stocks today
+    msg += "\n<b>🔍 FOCUS STOCKS TODAY</b>\n"
+    focus = ["SUZLON", "YESBANK", "IDEA", "RVNL", "OLAELEC", "COALINDIA", "ITC", "CANBK"]
+    for s in focus:
+        msg += f"▪{s}: {get_price(s)}\n"
 
     await send_telegram(msg)
 
-# =========================================================
-# SCHEDULER
-# =========================================================
+    # Morning news digest
+    await asyncio.sleep(2)
+    news_msg = f"📰 <b>MORNING NEWS DIGEST | {now}</b>\n{'─'*25}\n\n"
 
-scheduler = AsyncIOScheduler(timezone=IST)
+    for query, label in NEWS_TOPICS[:6]:
+        articles = await fetch_news(query, 2)
+        if articles:
+            news_msg += f"<b>{label}</b>\n"
+            for a in articles:
+                title = a.get("title", "")
+                source = a.get("source", {}).get("name", "")
+                url = a.get("url", "")
+                news_id = get_news_id(title)
+                SENT_IDS.add(news_id)
+                news_msg += f"▪{title}\n🔗 {source}\n{url}\n\n"
 
-scheduler.add_job(
-    morning_briefing,
-    "cron",
-    hour=7,
-    minute=0
-)
+    await send_telegram(news_msg)
 
-scheduler.add_job(
-    send_live_news,
-    "interval",
-    minutes=1
-)
 
-scheduler.start()
+def run_async(coro):
+    asyncio.run(coro)
 
-# =========================================================
-# START BOT
-# =========================================================
 
-print("✅ Premium India Market Bot Started")
+def setup_schedule():
+    # 7 AM morning briefing
+    schedule.every().day.at("07:00").do(lambda: run_async(morning_briefing()))
 
-asyncio.get_event_loop().run_forever()
+    # Live news every 10 mins — 24/7
+    schedule.every(10).minutes.do(lambda: run_async(send_live_news()))
+
+
+if __name__ == "__main__":
+    print("Bot started!")
+    setup_schedule()
+    # Run news immediately on start
+    asyncio.run(send_live_news())
+    while True:
+        schedule.run_pending()
+        time.sleep(60)
