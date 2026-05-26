@@ -1,7 +1,9 @@
 # =========================================================
 # AI TELEGRAM STOCK MARKET BOT
-# FINAL PRODUCTION VERSION
+# FINAL ADVANCED VERSION
+# INDIA MARKET PRIORITY
 # NO DUPLICATES
+# IMPORTANT NEWS ONLY
 # LIVE NEWS EVERY 1 MINUTE
 # RENDER FREE PLAN READY
 # =========================================================
@@ -33,6 +35,7 @@ IST = timezone("Asia/Kolkata")
 # =========================================================
 
 WATCHLIST = [
+
     "groww",
     "sammancap",
     "iex",
@@ -74,6 +77,43 @@ WATCHLIST = [
     "gold",
     "silver",
     "suntv"
+
+]
+
+# =========================================================
+# IMPORTANT MARKET KEYWORDS
+# =========================================================
+
+IMPORTANT_KEYWORDS = [
+
+    "fii",
+    "fpi",
+    "dii",
+    "war",
+    "rbi",
+    "fed",
+    "nifty",
+    "sensex",
+    "bank nifty",
+    "crude",
+    "inflation",
+    "market",
+    "stocks",
+    "results",
+    "dividend",
+    "order",
+    "india",
+    "railway",
+    "defence",
+    "profit",
+    "loss",
+    "ipo",
+    "tariff",
+    "china",
+    "russia",
+    "ukraine",
+    "middle east",
+    "us market",
 ]
 
 # =========================================================
@@ -83,6 +123,8 @@ WATCHLIST = [
 RSS_FEEDS = [
 
     "https://www.moneycontrol.com/rss/business.xml",
+
+    "https://www.moneycontrol.com/rss/MCtopnews.xml",
 
     "https://www.livemint.com/rss/markets",
 
@@ -107,10 +149,15 @@ async def send_telegram(message):
     async with httpx.AsyncClient() as client:
 
         payload = {
+
             "chat_id": CHAT_ID,
+
             "text": message,
+
             "parse_mode": "HTML",
+
             "disable_web_page_preview": True
+
         }
 
         try:
@@ -147,14 +194,13 @@ def is_duplicate(title):
 
     SENT_NEWS.append(title)
 
-    # MEMORY LIMIT
     if len(SENT_NEWS) > 2000:
         SENT_NEWS.pop(0)
 
     return False
 
 # =========================================================
-# SIMPLE SENTIMENT
+# SIMPLE SENTIMENT ENGINE
 # =========================================================
 
 def get_sentiment(title):
@@ -167,13 +213,15 @@ def get_sentiment(title):
         "gain",
         "rise",
         "profit",
-        "order",
         "approval",
         "bullish",
         "growth",
         "strong",
-        "record",
         "high",
+        "record",
+        "buy",
+        "up",
+
     ]
 
     negative_words = [
@@ -182,12 +230,14 @@ def get_sentiment(title):
         "decline",
         "loss",
         "war",
-        "crash",
         "weak",
         "drop",
         "bearish",
-        "low",
+        "crash",
         "cuts",
+        "down",
+        "sell",
+
     ]
 
     for word in positive_words:
@@ -210,54 +260,73 @@ def market_impact(title):
 
     title = title.lower()
 
-    rules = {
+    impacts = {
 
-        "rbi":
-        "Banking stocks may remain active today.",
+        "fii":
+        "FII activity may impact overall market sentiment.",
 
-        "inflation":
-        "Markets may react cautiously.",
+        "fpi":
+        "Foreign investor activity may influence markets.",
 
-        "crude":
-        "Oil-sensitive sectors may face pressure.",
+        "dii":
+        "Domestic institutions remain active in markets.",
 
         "war":
-        "Global volatility may increase.",
+        "Global uncertainty may increase market volatility.",
 
-        "railway":
-        "Railway stocks may stay in focus.",
-
-        "defence":
-        "Defence sector sentiment may improve.",
-
-        "order":
-        "Positive sentiment possible in related stocks.",
+        "rbi":
+        "Banking and financial stocks may stay active.",
 
         "fed":
-        "Global market volatility may continue.",
+        "US Fed commentary may affect global markets.",
+
+        "crude":
+        "Oil price movement may impact Indian markets.",
+
+        "inflation":
+        "Inflation concerns may pressure equities.",
+
+        "railway":
+        "Railway stocks may remain in focus.",
+
+        "defence":
+        "Defence stocks may see buying interest.",
+
+        "order":
+        "Positive order inflow may support stock sentiment.",
+
+        "results":
+        "Quarterly results may drive stock volatility.",
+
+        "profit":
+        "Strong earnings sentiment possible.",
+
+        "loss":
+        "Weak earnings sentiment possible.",
+
+        "dividend":
+        "Dividend-related buying interest possible.",
+
+        "nifty":
+        "Index movement may influence broader markets.",
+
+        "sensex":
+        "Benchmark indices remain volatile.",
 
         "gold":
-        "Gold-related stocks may stay active.",
+        "Gold-related stocks and ETFs may stay active.",
 
         "silver":
         "Silver ETFs may remain volatile.",
 
-        "results":
-        "Stock-specific volatility expected.",
-
-        "profit":
-        "Positive earnings sentiment possible.",
-
-        "loss":
-        "Negative sentiment may affect the stock.",
     }
 
-    for key, reason in rules.items():
+    for key, value in impacts.items():
 
         if key in title:
-            return reason
+            return value
 
-    return "Monitoring market impact."
+    return "Market participants monitoring developments."
 
 # =========================================================
 # MARKET OUTLOOK
@@ -269,6 +338,7 @@ def market_prediction():
 
         dow = yf.Ticker("^DJI").history(period="2d")
         nasdaq = yf.Ticker("^IXIC").history(period="2d")
+        sp500 = yf.Ticker("^GSPC").history(period="2d")
 
         dow_change = (
             (dow["Close"].iloc[-1] - dow["Close"].iloc[-2])
@@ -280,18 +350,21 @@ def market_prediction():
             / nasdaq["Close"].iloc[-2]
         ) * 100
 
+        sp_change = (
+            (sp500["Close"].iloc[-1] - sp500["Close"].iloc[-2])
+            / sp500["Close"].iloc[-2]
+        ) * 100
+
         if dow_change > 0.5 and nasdaq_change > 0.5:
 
             return (
-                "🟢 Indian markets may open positive "
-                "supported by strong global cues."
+                "🟢 Positive opening expected due to strong global cues."
             )
 
-        elif dow_change < -0.5:
+        elif dow_change < -0.5 or sp_change < -0.5:
 
             return (
-                "🔴 Weak market opening possible "
-                "due to weak global sentiment."
+                "🔴 Weak opening possible due to negative global sentiment."
             )
 
         return "⚪ Flat to volatile opening expected."
@@ -301,7 +374,7 @@ def market_prediction():
         return "⚪ Market outlook unavailable."
 
 # =========================================================
-# GET INDEX CHANGE
+# INDEX CHANGE
 # =========================================================
 
 def get_change(symbol):
@@ -357,19 +430,39 @@ async def fetch_news():
 
             feed = feedparser.parse(url)
 
-            for entry in feed.entries[:10]:
+            for entry in feed.entries[:20]:
 
                 title = entry.title.strip()
 
                 if is_duplicate(title):
                     continue
 
-                priority = is_watchlist_news(title)
+                title_lower = title.lower()
+
+                important = any(
+                    word in title_lower
+                    for word in IMPORTANT_KEYWORDS
+                )
+
+                priority = (
+                    is_watchlist_news(title)
+                    or important
+                )
+
+                if not priority:
+                    continue
 
                 collected_news.append({
+
                     "title": title,
-                    "source": feed.feed.get("title", "News"),
+
+                    "source": feed.feed.get(
+                        "title",
+                        "News"
+                    ),
+
                     "priority": priority
+
                 })
 
         except Exception as e:
@@ -384,13 +477,13 @@ async def fetch_news():
 
 def format_news(title, sentiment, impact, source):
 
-    return f'''
+    return f"""
 {sentiment} <b>{title}</b>
 
-{impact}
+📌 {impact}
 
-— {source}
-'''
+📰 {source}
+"""
 
 # =========================================================
 # LIVE MARKET NEWS
@@ -400,7 +493,7 @@ async def send_live_news():
 
     now = datetime.now(IST)
 
-    # MARKET HOURS ONLY
+    # MARKET HOURS
     if not (8 <= now.hour <= 16):
         return
 
@@ -408,14 +501,13 @@ async def send_live_news():
 
     news_list = await fetch_news()
 
-    # WATCHLIST PRIORITY
     news_list = sorted(
         news_list,
         key=lambda x: x["priority"],
         reverse=True
     )
 
-    for news in news_list[:8]:
+    for news in news_list[:6]:
 
         title = news["title"]
 
@@ -451,7 +543,7 @@ async def morning_briefing():
 
     outlook = market_prediction()
 
-    msg = f'''
+    msg = f"""
 🌅 <b>MORNING MARKET SETUP</b>
 📅 {today}
 
@@ -467,13 +559,13 @@ async def morning_briefing():
 
 ▪ Nifty: {nifty}
 
-{outlook}
+📌 {outlook}
 
 🔥 <b>WATCHLIST STOCKS</b>
 
 🟢 RVNL
-🟢 BEL
 🟢 SUZLON
+🟢 BEL
 🟢 IREDA
 🟢 YES BANK
 🟢 IEX
@@ -481,13 +573,14 @@ async def morning_briefing():
 
 ⚠️ <b>KEY MARKET TRIGGERS</b>
 
-▪ RBI commentary
-▪ Crude oil movement
-▪ Corporate results
-▪ Global market cues
+▪ FII / DII Activity
+▪ RBI Commentary
+▪ Crude Oil Prices
+▪ Corporate Results
+▪ Global Market Cues
 
 ━━━━━━━━━━━━━━
-'''
+"""
 
     await send_telegram(msg)
 
@@ -497,7 +590,7 @@ async def morning_briefing():
 
 scheduler = AsyncIOScheduler(timezone=IST)
 
-# MORNING BRIEFING - 7 AM
+# 7 AM MORNING BRIEFING
 scheduler.add_job(
     morning_briefing,
     "cron",
