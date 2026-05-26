@@ -1,6 +1,7 @@
 # =========================================================
 # AI TELEGRAM STOCK MARKET BOT
-# FINAL READY TO USE VERSION
+# LIGHTWEIGHT VERSION (NO FINBERT)
+# RENDER FREE PLAN FRIENDLY
 # =========================================================
 
 import asyncio
@@ -12,7 +13,6 @@ from datetime import datetime
 from pytz import timezone
 
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from transformers import pipeline
 from rapidfuzz import fuzz
 
 # =========================================================
@@ -27,20 +27,7 @@ TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 IST = timezone("Asia/Kolkata")
 
 # =========================================================
-# LOAD AI MODEL
-# =========================================================
-
-print("Loading AI Model...")
-
-finbert = pipeline(
-    "sentiment-analysis",
-    model="ProsusAI/finbert"
-)
-
-print("AI Loaded Successfully")
-
-# =========================================================
-# YOUR WATCHLIST
+# WATCHLIST
 # =========================================================
 
 WATCHLIST = [
@@ -121,13 +108,13 @@ async def send_telegram(message):
 
         try:
 
-            await client.post(
+            response = await client.post(
                 TELEGRAM_URL,
                 json=payload,
                 timeout=20
             )
 
-            print("Message Sent")
+            print("Telegram Status:", response.status_code)
 
         except Exception as e:
 
@@ -157,31 +144,49 @@ def is_duplicate(title):
     return False
 
 # =========================================================
-# AI SENTIMENT
+# SIMPLE SENTIMENT
 # =========================================================
 
 def get_sentiment(title):
 
-    try:
+    title = title.lower()
 
-        result = finbert(title)[0]
+    positive_words = [
+        "surge",
+        "gain",
+        "rise",
+        "profit",
+        "order",
+        "approval",
+        "bullish",
+        "growth",
+    ]
 
-        label = result["label"].lower()
+    negative_words = [
+        "fall",
+        "decline",
+        "loss",
+        "war",
+        "crash",
+        "weak",
+        "drop",
+        "bearish",
+    ]
 
-        if label == "positive":
+    for word in positive_words:
+
+        if word in title:
             return "🟢"
 
-        elif label == "negative":
+    for word in negative_words:
+
+        if word in title:
             return "🔴"
 
-        return "⚪"
-
-    except:
-
-        return "⚪"
+    return "⚪"
 
 # =========================================================
-# MARKET IMPACT ENGINE
+# MARKET IMPACT
 # =========================================================
 
 def market_impact(title):
@@ -232,7 +237,7 @@ def market_impact(title):
     return "Monitoring market impact."
 
 # =========================================================
-# MARKET OUTLOOK ENGINE
+# MARKET OUTLOOK
 # =========================================================
 
 def market_prediction():
@@ -273,7 +278,7 @@ def market_prediction():
         return "⚪ Market outlook unavailable."
 
 # =========================================================
-# GET INDEX CHANGE
+# INDEX CHANGE
 # =========================================================
 
 def get_change(symbol):
@@ -460,6 +465,16 @@ async def morning_briefing():
     await send_telegram(msg)
 
 # =========================================================
+# TEST MESSAGE
+# =========================================================
+
+async def startup_message():
+
+    await send_telegram(
+        "✅ AI Stock Market Bot Started Successfully"
+    )
+
+# =========================================================
 # SCHEDULER
 # =========================================================
 
@@ -484,6 +499,8 @@ scheduler.start()
 # START BOT
 # =========================================================
 
-print("✅ AI Stock Market Bot Started")
+asyncio.run(startup_message())
+
+print("✅ Bot Running...")
 
 asyncio.get_event_loop().run_forever()
