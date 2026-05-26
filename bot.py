@@ -1,7 +1,8 @@
 # =========================================================
 # AI TELEGRAM STOCK MARKET BOT
-# LIGHTWEIGHT VERSION (NO FINBERT)
-# RENDER FREE PLAN FRIENDLY
+# FINAL STABLE VERSION
+# NO SPAM STARTUP MESSAGE
+# RENDER FREE PLAN READY
 # =========================================================
 
 import asyncio
@@ -377,6 +378,7 @@ async def send_live_news():
 
     now = datetime.now(IST)
 
+    # MARKET HOURS ONLY
     if not (8 <= now.hour <= 16):
         return
 
@@ -465,21 +467,12 @@ async def morning_briefing():
     await send_telegram(msg)
 
 # =========================================================
-# TEST MESSAGE
-# =========================================================
-
-async def startup_message():
-
-    await send_telegram(
-        "✅ AI Stock Market Bot Started Successfully"
-    )
-
-# =========================================================
 # SCHEDULER
 # =========================================================
 
 scheduler = AsyncIOScheduler(timezone=IST)
 
+# 7 AM MORNING BRIEFING
 scheduler.add_job(
     morning_briefing,
     "cron",
@@ -487,6 +480,7 @@ scheduler.add_job(
     minute=0
 )
 
+# LIVE MARKET NEWS EVERY 5 MINUTES
 scheduler.add_job(
     send_live_news,
     "interval",
@@ -499,8 +493,6 @@ scheduler.start()
 # START BOT
 # =========================================================
 
-asyncio.run(startup_message())
-
-print("✅ Bot Running...")
+print("✅ AI Stock Market Bot Running...")
 
 asyncio.get_event_loop().run_forever()
