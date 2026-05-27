@@ -1,7 +1,6 @@
-httpx==0.27.0
-yfinance==0.2.40
-feedparser==6.0.11
-APScheduler==3.10.4
-rapidfuzz==3.6.1
-pytz==2024.1
-pandas==2.1.4
+httpx
+yfinance
+feedparser
+rapidfuzz
+pytz
+pandas
