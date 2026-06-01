@@ -1,8 +1,10 @@
 httpx
-yfinance
+requests
 feedparser
 rapidfuzz
 pytz
 pandas
+yfinance
 beautifulsoup4
 lxml
+flask
