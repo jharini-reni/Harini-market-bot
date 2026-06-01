@@ -4,3 +4,5 @@ feedparser
 rapidfuzz
 pytz
 pandas
+beautifulsoup4
+lxml
