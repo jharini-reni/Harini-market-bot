@@ -79,8 +79,8 @@ BLOCKED_WORDS = [
 ]
 
 BLOCKED_NEWS = [
-    "bitcoin", "ethereum", "crypto", "cryptocurrency", "blockchain", "web3",
-    "nft", "defi", "binance", "coinbase", "dogecoin", "altcoin",
+    "bitcoin", "ethereum", "crypto", "cryptocurrency", "blockchain",
+    "nft", "defi", "binance", "coinbase", "dogecoin",
     "cricket", "ipl", "football", "tennis",
     "bollywood", "hollywood", "celebrity", "movie release",
     "music album", "entertainment", "actor", "actress",
@@ -161,7 +161,8 @@ def get_sentiment(title):
         "buyback", "rating upgrade", "fii buying", "inflow",
         "rally", "surge", "gain", "approval", "mou signed",
         "rate cut", "record high", "capacity expansion",
-        "listing gain", "strong demand"
+        "listing gain", "strong demand", "jump", "swings into profit",
+        "record revenue", "record annual"
     ]
     negative = [
         "loss", "fall", "drop", "decline", "crash", "weak",
@@ -169,7 +170,7 @@ def get_sentiment(title):
         "promoter selling", "stake sale", "fii selling", "outflow",
         "rating downgrade", "profit miss", "revenue miss",
         "resignation", "war escalation", "oil surge",
-        "rupee falls", "listing loss"
+        "rupee falls", "listing loss", "misleading"
     ]
     for word in positive:
         if word in t:
@@ -177,66 +178,122 @@ def get_sentiment(title):
     for word in negative:
         if word in t:
             return "🔴"
-    return "⚪"
+    return "🔵"
 
 
-def market_impact(title):
+def get_stock_name(title):
+    """Extract stock name from title"""
     t = title.lower()
-    if "dividend record date" in t or "dividend declared" in t:
-        return "Dividend play active — investors may accumulate before record date."
-    if "bonus shares" in t or "stock split" in t:
-        return "Corporate action positive — retail investor interest likely to increase."
-    if "buyback" in t:
-        return "Buyback signals management confidence — positive for shareholders."
-    if "order" in t and ("win" in t or "bag" in t or "award" in t or "inflow" in t):
-        return "Order win strengthens revenue visibility and improves earnings outlook."
-    if "mou" in t or ("agreement" in t and "sign" in t):
-        return "Strategic tie-up opens new business opportunities and revenue streams."
-    if ("results" in t or "net profit" in t) and ("rise" in t or "jump" in t or "up" in t):
-        return "Strong quarterly results — earnings growth may trigger fresh buying."
-    if ("results" in t or "net profit" in t) and ("loss" in t or "miss" in t or "decline" in t):
-        return "Weak quarterly results — stock may face selling pressure near-term."
-    if "results" in t or "net profit" in t or "revenue" in t:
-        return "Quarterly earnings in focus — investors tracking margins and guidance."
-    if "sebi" in t and ("ban" in t or "penalty" in t or "action" in t):
-        return "Regulatory action by SEBI — governance concern may impact stock sentiment."
-    if "rating upgrade" in t:
-        return "Credit rating upgrade — borrowing costs may reduce, positive for expansion."
-    if "rating downgrade" in t:
-        return "Credit rating downgrade — debt servicing concern, caution advised."
-    if "promoter" in t and ("sell" in t or "stake" in t):
-        return "Promoter stake reduction — insider exit signal, monitor closely."
-    if "fii" in t or "fpi" in t:
-        return "FII activity — foreign flows are a key driver for market direction."
-    if "rbi" in t or "repo rate" in t:
-        return "RBI policy update — banking and rate-sensitive stocks may react sharply."
-    if "crude oil" in t or "brent" in t or "opec" in t:
-        return "Crude oil movement directly impacts India's import bill, rupee and inflation."
-    if "gold" in t and ("price" in t or "rise" in t or "fall" in t):
-        return "Gold price movement impacts GoldBees ETF and jewellery stocks."
-    if "silver" in t and ("price" in t or "rise" in t or "fall" in t):
-        return "Silver price shift impacts SilverBees ETF and MCX commodity traders."
-    if "rupee" in t:
-        return "Rupee movement affects IT exporters positively and import sectors negatively."
-    if "gift nifty" in t or "sgx nifty" in t:
-        return "Pre-market signal — indicates likely opening direction for Nifty today."
-    if "dow jones" in t or "nasdaq" in t or "wall street" in t:
-        return "US market trend sets tone for Asian markets and FII sentiment toward India."
-    if "fed" in t or "rate cut" in t or "rate hike" in t:
-        return "US Fed policy impacts global liquidity and emerging market capital flows."
-    if "iran" in t or "middle east" in t or "west asia" in t:
-        return "Geopolitical tension impacts crude oil prices, rupee and market risk appetite."
-    if "war" in t or "russia" in t or "ukraine" in t:
-        return "Conflict escalation adds global uncertainty — markets may turn risk-off."
-    if "trump" in t or "tariff" in t or "trade war" in t:
-        return "Trade policy uncertainty may impact global supply chains and IT sector."
-    if "merger" in t or "acquisition" in t or "takeover" in t:
-        return "M&A activity — target company stock may see significant price movement."
-    if "inflation" in t or "cpi" in t:
-        return "Inflation data shapes RBI rate decisions — impacts rate-sensitive sectors."
-    if "gdp" in t:
-        return "GDP data shapes investor confidence and RBI's future policy stance."
-    return "Development closely tracked by market participants for potential sector impact."
+    for stock in WATCHLIST:
+        if stock in t:
+            return stock.upper()
+    return ""
+
+
+def get_bullet_points(title, summary=""):
+    """Generate 2-3 meaningful bullet points for the news"""
+    t = title.lower()
+    points = []
+
+    # First bullet — the news headline itself (cleaned)
+    points.append(title.strip())
+
+    # Second bullet — context based on news type
+    if "results" in t or "profit" in t or "revenue" in t:
+        if "jump" in t or "surge" in t or "rise" in t or "up" in t:
+            points.append("Strong quarterly performance with earnings beat — revenue and margin expansion noted.")
+        elif "loss" in t or "fall" in t or "decline" in t:
+            points.append("Below-expectation quarterly performance — margin pressure and revenue decline noted.")
+        else:
+            points.append("Quarterly earnings in focus — investors tracking margins, revenue and future guidance.")
+        if "dividend" in t:
+            points.append("Dividend declared alongside results — positive signal for income investors.")
+
+    elif "order" in t and ("win" in t or "bag" in t or "award" in t or "inflow" in t):
+        points.append("Fresh order win improves revenue visibility and strengthens the order book significantly.")
+        points.append("Positive earnings outlook and business momentum may attract fresh buying interest.")
+
+    elif "dividend" in t:
+        points.append("Dividend announcement rewards shareholders and signals strong cash flow position.")
+        points.append("Investors may accumulate stock before the record date to qualify for dividend.")
+
+    elif "sebi" in t and ("penalty" in t or "ban" in t or "action" in t):
+        points.append("Regulatory action by SEBI raises governance concerns — stock may see near-term pressure.")
+        points.append("Company may appeal the order — outcome will be closely tracked by investors.")
+
+    elif "promoter" in t and ("sell" in t or "stake" in t):
+        points.append("Promoter stake reduction signals potential insider exit — monitor closely for further selling.")
+        points.append("FII and retail investor activity in the stock will be closely watched post this development.")
+
+    elif "fii" in t or "fpi" in t:
+        if "buy" in t or "inflow" in t:
+            points.append("FII inflows signal foreign confidence in India — positive for broader market sentiment.")
+        else:
+            points.append("FII outflows may create near-term selling pressure — watch for reversal signals.")
+
+    elif "rbi" in t or "repo rate" in t:
+        points.append("RBI commentary may impact banking and rate-sensitive sectors sharply.")
+        points.append("Market will closely watch any change in monetary policy stance or liquidity guidance.")
+
+    elif "crude oil" in t or "brent" in t or "opec" in t:
+        points.append("Crude oil movement directly impacts India's import bill, current account and rupee.")
+        points.append("Oil-sensitive sectors like OMCs, aviation and paints may react to this development.")
+
+    elif "gold" in t and "price" in t:
+        points.append("Gold price movement impacts GoldBees ETF, jewellery stocks and MCX commodity traders.")
+        points.append("Rising gold often signals global risk-off sentiment — watch FII flows accordingly.")
+
+    elif "rupee" in t:
+        points.append("Rupee weakness benefits IT exporters but pressures import-heavy sectors like oil and electronics.")
+        points.append("RBI may intervene in forex markets if rupee movement becomes disorderly.")
+
+    elif "gift nifty" in t or "sgx nifty" in t:
+        points.append("Pre-market indicator signals likely opening direction for Nifty 50 today.")
+        points.append("Investors will watch if opening gap sustains or reverses in early trade.")
+
+    elif "dow" in t or "nasdaq" in t or "wall street" in t:
+        points.append("US market performance sets the tone for Asian markets and FII sentiment toward India.")
+        points.append("Tech-heavy Nasdaq movement may influence Indian IT sector stocks at open.")
+
+    elif "iran" in t or "middle east" in t or "west asia" in t or "war" in t:
+        points.append("Geopolitical tension may spike crude oil prices — negative for India's trade deficit.")
+        points.append("Risk-off global sentiment may trigger FII outflows from emerging markets including India.")
+
+    elif "merger" in t or "acquisition" in t or "takeover" in t:
+        points.append("M&A deal may unlock significant value — target company stock likely to see sharp movement.")
+        points.append("Synergy benefits and deal premium will be closely evaluated by institutional investors.")
+
+    elif "buyback" in t:
+        points.append("Buyback signals management confidence in the company's fundamentals and future outlook.")
+        points.append("Shareholders tendering at premium price may benefit — watch buyback price vs market price.")
+
+    elif "mou" in t or "agreement" in t:
+        points.append("Strategic partnership opens new revenue opportunities and strengthens long-term growth outlook.")
+        points.append("Execution of the agreement and timeline will be key monitorables going forward.")
+
+    else:
+        points.append("Development closely tracked by market participants for potential sector and stock impact.")
+
+    return points[:3]  # Max 3 bullet points
+
+
+def get_source_short(source):
+    """Shorten source name"""
+    source_map = {
+        "Markets-Economic Times": "ET",
+        "Economic Times": "ET",
+        "Moneycontrol": "Moneycontrol",
+        "NDTV Profit - Latest": "NDTV Profit",
+        "NDTV Profit": "NDTV Profit",
+        "Business Standard": "Business Standard",
+        "mint - markets": "LiveMint",
+        "LiveMint": "LiveMint",
+        "The Hindu": "The Hindu",
+    }
+    for key, val in source_map.items():
+        if key.lower() in source.lower():
+            return val
+    return source
 
 
 async def fetch_news():
@@ -270,17 +327,31 @@ async def send_live_news():
     if not news_list:
         print("No new news")
         return
+
     for news in news_list[:5]:
         title = news["title"]
+        source = get_source_short(news["source"])
         sentiment = get_sentiment(title)
-        impact = market_impact(title)
-        source = news["source"]
+        stock_name = get_stock_name(title)
+        bullets = get_bullet_points(title)
+
+        # Build header
+        if stock_name:
+            header = f"{sentiment} *{stock_name}:*"
+        else:
+            header = f"{sentiment}"
+
+        # Build bullet points
+        bullet_text = ""
+        for point in bullets:
+            bullet_text += f"\n▪️ {point}"
+
         msg = (
-            f"{sentiment} *{title}*\n\n"
-            f"📌 {impact}\n\n"
-            f"📰 Source: {source}\n\n"
-            f"──────────────────────────────"
+            f"{header}\n"
+            f"{bullet_text}\n\n"
+            f"📰 Source: {source}"
         )
+
         await send_telegram(msg)
         await asyncio.sleep(3)
 
@@ -349,20 +420,13 @@ async def morning_briefing():
 
 async def main():
     print("✅ Premium India Market Bot Started!")
-    # Send startup news immediately
     await send_live_news()
-
     while True:
         now = datetime.now(IST)
-
-        # 7 AM morning briefing
         if now.hour == 7 and now.minute == 0:
             await morning_briefing()
-
-        # Every 10 mins send news
         if now.minute % 10 == 0:
             await send_live_news()
-
         await asyncio.sleep(60)
 
 
