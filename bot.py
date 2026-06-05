@@ -15,6 +15,24 @@ IST = timezone("Asia/Kolkata")
 
 SENT_NEWS = []
 LAST_BRIEFING_DATE = None
+SENT_NEWS_FILE = "sent_news.txt"
+
+def load_sent_news():
+    global SENT_NEWS
+    try:
+        with open(SENT_NEWS_FILE, "r") as f:
+            SENT_NEWS = [line.strip() for line in f.readlines() if line.strip()]
+        print(f"Loaded {len(SENT_NEWS)} sent news from file")
+    except:
+        SENT_NEWS = []
+
+def save_sent_news():
+    try:
+        with open(SENT_NEWS_FILE, "w") as f:
+            for item in SENT_NEWS[-2000:]:
+                f.write(item + "\n")
+    except:
+        pass
 
 # Flask app to satisfy Render port requirement
 app = Flask(__name__)
@@ -63,16 +81,28 @@ IMPORTANT_KEYWORDS = [
 ]
 
 BLOCKED_WORDS = [
-    "where are prices headed", "should you buy", "should you invest",
-    "buy or sell", "buy or avoid", "top stocks to buy",
-    "best stocks to buy", "stocks to buy today",
-    "multibagger opportunity", "expert suggests buy",
-    "sip returns", "mutual fund nav",
-    "5 stocks to", "10 stocks to", "top 5 stocks", "top 10 stocks",
-    "how to invest", "beginners guide",
-    "city-wise rates", "price in your city", "check rates",
-    "ipo gmp today", "grey market premium today",
-    "intraday strategy", "weekly market outlook",
+    # Questions & recommendations
+    "should you", "would you", "can you", "will you",
+    "is it time", "time to buy", "time to sell",
+    "buy or sell", "buy or avoid", "should you subscribe",
+    "what's buzzing", "what is buzzing", "what's fueling",
+    "where are prices", "where is market",
+    # Recommendations
+    "top stocks", "best stocks", "stocks to buy",
+    "multibagger", "expert suggests", "analyst recommends",
+    "brokerage says", "target price", "stop loss",
+    "technical analysis", "chart pattern", "moving average",
+    "share price live", "price live update", "live update",
+    "share price today", "stock price today",
+    # Generic/useless
+    "sip returns", "mutual fund nav", "how to invest",
+    "beginners guide", "city-wise rates", "check rates",
+    "ipo gmp", "grey market premium", "intraday strategy",
+    "weekly outlook", "monthly outlook",
+    "5 stocks", "10 stocks", "top 5", "top 10",
+    "privacy", "google assistant", "pixel launch",
+    "what's hot", "what is hot", "buzzing stocks",
+    "cautiously optimistic", "earnings revival",
 ]
 
 BLOCKED_NEWS = [
@@ -124,6 +154,7 @@ def is_duplicate(title):
     SENT_NEWS.append(cleaned)
     if len(SENT_NEWS) > 3000:
         SENT_NEWS.pop(0)
+    save_sent_news()
     return False
 
 
@@ -252,8 +283,14 @@ def get_bullet_points(title):
     elif "inflation" in t or "cpi" in t:
         points.append("Inflation data shapes RBI rate decisions — impacts rate-sensitive banking sector.")
         points.append("Above-estimate inflation may delay rate cuts — negative for equity markets.")
+    elif "rally" in t or "surge" in t or "rise" in t or "jump" in t:
+        points.append("Strong price movement signals positive momentum — watch for follow-through buying.")
+        points.append("Sector peers may also attract buying interest on this development.")
+    elif "fall" in t or "drop" in t or "decline" in t or "crash" in t:
+        points.append("Sharp price decline signals caution — watch for support levels and reversal signs.")
+        points.append("Broader sector may also see sympathy selling — monitor closely.")
     else:
-        points.append("Market participants closely tracking this for potential sector and stock impact.")
+        points.append("This development may have a direct impact on the stock and related sector.")
 
     return points[:3]
 
@@ -375,6 +412,7 @@ async def morning_briefing():
 
 async def bot_loop():
     print("✅ Bot Started!")
+    load_sent_news()
     await send_live_news()
     while True:
         now = datetime.now(IST)
