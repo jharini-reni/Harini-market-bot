@@ -5,6 +5,8 @@ import yfinance as yf
 from datetime import datetime
 from pytz import timezone
 from rapidfuzz import fuzz
+import threading
+from flask import Flask
 
 BOT_TOKEN = "8920822727:AAEoeYvwnNrIU58ODEJVGCCLiHy1wSa-VAc"
 CHAT_ID = "1212371388"
@@ -13,6 +15,17 @@ IST = timezone("Asia/Kolkata")
 
 SENT_NEWS = []
 LAST_BRIEFING_DATE = None
+
+# Flask app to satisfy Render port requirement
+app = Flask(__name__)
+
+@app.route('/')
+def home():
+    return "✅ India Market Bot is Running!", 200
+
+@app.route('/health')
+def health():
+    return "OK", 200
 
 WATCHLIST = [
     "rvnl", "suzlon", "vodafone idea", "yes bank", "ireda", "iex", "bel",
@@ -23,76 +36,51 @@ WATCHLIST = [
     "hyundai india", "diamond cable", "geojit", "goldbees", "silverbees",
     "lg india", "groww", "lenskart", "samman", "embassy reit",
     "lemon tree", "eternal", "hfcl", "inoxwind", "canbk", "yesbank",
-    "olaelec", "bankbaroda", "idea cellular", "suzlon energy",
-    "yes bank", "ireda", "iex", "bel india", "itc ltd",
-    "coal india", "vedanta ltd", "canara", "bank baroda",
-    "punjab national", "wipro ltd", "tata technologies",
-    "ola electric", "inox wind", "mrpl", "jubilant food",
-    "thangamayil jewellery", "ather", "kalyan", "niva",
-    "redington india", "hyundai", "geojit financial",
-    "gold bees", "silver bees", "lg electronics india"
+    "olaelec", "bankbaroda", "punjab national", "suzlon energy",
 ]
 
-# Very broad — catch ALL stock/market news
 IMPORTANT_KEYWORDS = [
-    # Any results/earnings
     "results", "profit", "loss", "revenue", "ebitda", "earnings", "q4", "q3", "q2", "q1",
-    "quarterly", "annual results", "fy26", "fy25", "fy2026",
-    # Corporate actions
+    "quarterly", "annual results", "fy26", "fy25",
     "dividend", "bonus", "split", "buyback", "rights issue", "qip", "ofs",
     "block deal", "bulk deal", "stake", "promoter",
-    # Orders/business
     "order", "contract", "mou", "agreement", "wins", "bags", "awarded",
-    "capacity", "expansion", "plant", "facility", "launch",
-    # M&A
+    "capacity", "expansion", "plant", "launch",
     "merger", "acquisition", "takeover", "demerger", "joint venture",
-    # Market
     "nifty", "sensex", "bank nifty", "gift nifty", "sgx nifty",
     "fii", "fpi", "dii", "institutional",
-    # Macro
     "rbi", "sebi", "repo rate", "monetary", "inflation", "gdp", "cpi",
     "rupee", "dollar", "forex", "credit rating",
-    # Commodities
     "crude oil", "brent", "opec", "gold", "silver", "mcx",
-    # Global
     "fed", "federal reserve", "dow jones", "nasdaq", "wall street",
     "iran", "russia", "ukraine", "west asia", "middle east", "trump",
     "trade war", "tariff", "china",
-    # IPO
-    "ipo", "listing", "allotment",
-    # General market
+    "ipo", "listing",
     "rally", "crash", "surge", "plunge", "jump", "fall", "drop",
     "record high", "record low", "52 week", "all time high",
-    "upgrade", "downgrade", "target", "recommendation",
     "shares rise", "shares fall", "shares jump", "shares drop",
-    "stock rises", "stock falls", "stock jumps",
-    "market opens", "market close", "opening bell",
+    "stock rises", "stock falls",
 ]
 
-# STRICT block — only block clear junk
 BLOCKED_WORDS = [
     "where are prices headed", "should you buy", "should you invest",
     "buy or sell", "buy or avoid", "top stocks to buy",
     "best stocks to buy", "stocks to buy today",
     "multibagger opportunity", "expert suggests buy",
-    "technical analysis says", "chart pattern shows",
     "sip returns", "mutual fund nav",
-    "5 stocks", "10 stocks", "top 5 stocks", "top 10 stocks",
-    "how to invest", "beginners guide to",
-    "city-wise rates", "city wise rates",
-    "price in your city", "check rates",
-    "ipo allotment status", "ipo gmp today",
-    "grey market premium today",
-    "morning trade setup", "intraday strategy",
-    "weekly market outlook", "monthly market outlook",
+    "5 stocks to", "10 stocks to", "top 5 stocks", "top 10 stocks",
+    "how to invest", "beginners guide",
+    "city-wise rates", "price in your city", "check rates",
+    "ipo gmp today", "grey market premium today",
+    "intraday strategy", "weekly market outlook",
 ]
 
 BLOCKED_NEWS = [
     "bitcoin", "ethereum", "crypto", "cryptocurrency", "blockchain",
     "nft", "defi", "binance", "coinbase", "dogecoin",
-    "cricket", "ipl match", "football match",
+    "cricket match", "ipl match", "football match",
     "bollywood", "hollywood", "celebrity news",
-    "weather forecast", "recipe", "fashion",
+    "weather forecast", "recipe", "fashion week",
     "horoscope", "astrology",
 ]
 
@@ -161,7 +149,7 @@ def get_sentiment(title):
     neg = ["loss", "fall", "drop", "decline", "crash", "penalty",
            "sebi ban", "fraud", "default", "selling", "outflow",
            "downgrade", "miss", "weak", "concern", "plunge",
-           "record low", "misleading", "resignation", "warning"]
+           "misleading", "resignation", "warning", "sebi penalty"]
     for w in pos:
         if w in t:
             return "🟢"
@@ -176,22 +164,23 @@ def get_stock_name(title):
     stock_map = {
         "rvnl": "RVNL", "suzlon": "SUZLON", "vodafone idea": "IDEA",
         "yes bank": "YES BANK", "ireda": "IREDA", "iex": "IEX",
-        "bel": "BEL", "itc": "ITC", "coal india": "COAL INDIA",
-        "vedanta": "VEDANTA", "canara bank": "CANARA BANK",
-        "bank of baroda": "BANK OF BARODA", "pnb": "PNB", "wipro": "WIPRO",
+        " bel ": "BEL", "bel india": "BEL", "itc ltd": "ITC", " itc ": "ITC",
+        "coal india": "COAL INDIA", "vedanta": "VEDANTA",
+        "canara bank": "CANARA BANK", "bank of baroda": "BANK OF BARODA",
+        "bankbaroda": "BANK OF BARODA", " pnb ": "PNB",
+        "punjab national": "PNB", "wipro": "WIPRO",
         "tata tech": "TATA TECH", "tatatech": "TATA TECH",
         "ola electric": "OLA ELECTRIC", "inox wind": "INOX WIND",
-        "mrpl": "MRPL", "jublfood": "JUBLFOOD", "jubilant": "JUBLFOOD",
+        "inoxwind": "INOX WIND", "mrpl": "MRPL",
+        "jublfood": "JUBLFOOD", "jubilant food": "JUBLFOOD",
         "thangamayil": "THANGAMAYIL", "ather energy": "ATHER",
         "kalyan jewellers": "KALYAN", "niva bupa": "NIVA BUPA",
-        "redington": "REDINGTON", "hyundai": "HYUNDAI",
+        "redington": "REDINGTON", "hyundai india": "HYUNDAI",
         "geojit": "GEOJIT", "goldbees": "GOLDBEES",
         "silverbees": "SILVERBEES", "lg india": "LG INDIA",
         "groww": "GROWW", "lenskart": "LENSKART",
         "embassy reit": "EMBASSY REIT", "lemon tree": "LEMON TREE",
         "eternal": "ETERNAL", "hfcl": "HFCL",
-        "bank baroda": "BANK OF BARODA", "bankbaroda": "BANK OF BARODA",
-        "punjab national": "PNB",
     }
     for key, val in stock_map.items():
         if key in t:
@@ -203,7 +192,7 @@ def get_bullet_points(title):
     t = title.lower()
     points = [title.strip()]
 
-    if ("results" in t or "profit" in t) and ("jump" in t or "surge" in t or "rise" in t or "record" in t):
+    if ("results" in t or "profit" in t) and ("jump" in t or "surge" in t or "rise" in t or "record" in t or "beat" in t):
         points.append("Strong quarterly performance with earnings beat — positive for stock sentiment.")
         if "dividend" in t:
             points.append("Dividend declared alongside results — rewards shareholders and signals strong cash flows.")
@@ -221,75 +210,68 @@ def get_bullet_points(title):
         points.append("Investors may accumulate before record date to qualify for dividend.")
     elif "buyback" in t:
         points.append("Buyback signals management confidence in fundamentals — positive for shareholders.")
-        points.append("Investors tendering at premium price may benefit — watch buyback price vs CMP.")
+        points.append("Watch buyback price vs current market price for premium benefit.")
     elif "mou" in t or ("agreement" in t and "sign" in t):
         points.append("Strategic tie-up opens new revenue opportunities and strengthens growth outlook.")
-        points.append("Execution and timeline of the agreement will be key monitorables.")
+        points.append("Execution timeline of the agreement will be a key monitorable.")
     elif "sebi" in t and ("penalty" in t or "ban" in t or "action" in t):
         points.append("Regulatory action by SEBI raises governance concerns — near-term stock pressure likely.")
-        points.append("Company may appeal the order — outcome will be closely tracked by investors.")
+        points.append("Company may appeal the order — outcome closely tracked by investors.")
     elif "promoter" in t and ("sell" in t or "stake" in t):
         points.append("Promoter stake reduction signals potential insider exit — monitor closely.")
-        points.append("FII and retail activity in the stock will be watched post this development.")
+        points.append("FII and retail activity in the stock will be closely watched.")
     elif "fii" in t or "fpi" in t:
         if "buy" in t or "inflow" in t:
             points.append("FII inflows signal foreign confidence in India — positive for broader market.")
         else:
-            points.append("FII outflows may create near-term selling pressure — watch for reversal signals.")
+            points.append("FII outflows may create near-term selling pressure — watch for reversal.")
     elif "rbi" in t or "repo rate" in t:
         points.append("RBI commentary may impact banking and rate-sensitive sectors sharply.")
         points.append("Market will closely watch any change in monetary policy stance.")
     elif "crude oil" in t or "brent" in t or "opec" in t:
-        points.append("Crude oil movement impacts India's import bill, current account deficit and rupee.")
-        points.append("OMCs, aviation and paint sectors may react sharply to oil price movement.")
-    elif "gold" in t and ("price" in t or "rise" in t or "fall" in t):
+        points.append("Crude oil movement impacts India's import bill, current account and rupee.")
+        points.append("OMCs, aviation and paint sectors may react to oil price movement.")
+    elif "gold" in t and "price" in t:
         points.append("Gold price movement impacts GoldBees ETF and jewellery stocks.")
         points.append("Rising gold signals global risk-off — watch FII flows into India.")
     elif "rupee" in t:
-        points.append("Rupee weakness benefits IT exporters but pressures oil importers and inflation.")
-        points.append("RBI may intervene if rupee movement becomes disorderly.")
+        points.append("Rupee weakness benefits IT exporters but pressures oil and import sectors.")
+        points.append("RBI may intervene in forex markets if rupee movement becomes disorderly.")
     elif "gift nifty" in t or "sgx nifty" in t:
         points.append("Pre-market indicator signals likely opening direction for Nifty 50 today.")
-        points.append("Watch if opening gap sustains or reverses in early trade session.")
+        points.append("Watch if opening gap sustains or reverses in early trade.")
     elif "dow" in t or "nasdaq" in t or "wall street" in t:
         points.append("US market performance sets tone for Asian markets and FII flows into India.")
-        points.append("Nasdaq movement may influence Indian IT sector stocks at market open.")
+        points.append("Nasdaq movement may influence Indian IT sector stocks at open.")
     elif "iran" in t or "middle east" in t or "west asia" in t or "war" in t:
         points.append("Geopolitical tension may spike crude oil — negative for India's trade deficit.")
-        points.append("Risk-off sentiment may trigger FII outflows from emerging markets including India.")
+        points.append("Risk-off sentiment may trigger FII outflows from emerging markets.")
     elif "merger" in t or "acquisition" in t or "takeover" in t:
         points.append("M&A deal may unlock significant value — target stock likely to see sharp movement.")
         points.append("Synergy benefits and deal premium will be evaluated by institutional investors.")
-    elif "ipo" in t and "listing" in t:
-        points.append("IPO listing performance influences grey market sentiment and primary market mood.")
-        points.append("Strong listing may attract retail interest in upcoming IPOs in the pipeline.")
     elif "inflation" in t or "cpi" in t:
         points.append("Inflation data shapes RBI rate decisions — impacts rate-sensitive banking sector.")
-        points.append("Above-estimate inflation may delay rate cuts — negative for bond and equity markets.")
-    elif "gdp" in t:
-        points.append("GDP data shapes investor confidence and RBI's future monetary policy direction.")
-        points.append("Strong GDP may attract FII inflows into India's equity and debt markets.")
+        points.append("Above-estimate inflation may delay rate cuts — negative for equity markets.")
     else:
-        points.append("Market participants closely tracking this development for sector and stock impact.")
+        points.append("Market participants closely tracking this for potential sector and stock impact.")
 
     return points[:3]
 
 
 def get_source_short(source):
-    source_map = {
-        "markets-economic times": "ET",
-        "economic times": "ET",
-        "moneycontrol": "Moneycontrol",
-        "ndtv profit": "NDTV Profit",
-        "business standard": "Business Standard",
-        "mint": "LiveMint",
-        "livemint": "LiveMint",
-        "the hindu": "The Hindu",
-    }
     s = source.lower()
-    for key, val in source_map.items():
-        if key in s:
-            return val
+    if "economic times" in s or "et markets" in s:
+        return "ET"
+    if "moneycontrol" in s:
+        return "Moneycontrol"
+    if "ndtv" in s:
+        return "NDTV Profit"
+    if "business standard" in s:
+        return "Business Standard"
+    if "mint" in s:
+        return "LiveMint"
+    if "hindu" in s:
+        return "The Hindu"
     return source
 
 
@@ -331,15 +313,8 @@ async def send_live_news():
         stock_name = get_stock_name(title)
         bullets = get_bullet_points(title)
 
-        if stock_name:
-            header = f"{sentiment} *{stock_name}:*"
-        else:
-            header = f"{sentiment}"
-
-        bullet_text = ""
-        for point in bullets:
-            bullet_text += f"\n▪️ {point}"
-
+        header = f"{sentiment} *{stock_name}:*" if stock_name else f"{sentiment}"
+        bullet_text = "".join(f"\n▪️ {p}" for p in bullets)
         msg = f"{header}\n{bullet_text}\n\n📰 Source: {source}"
         await send_telegram(msg)
         await asyncio.sleep(3)
@@ -363,11 +338,9 @@ async def morning_briefing():
     if LAST_BRIEFING_DATE == today:
         return
     LAST_BRIEFING_DATE = today
-
     date_str = datetime.now(IST).strftime("%d %b %Y")
     msg = (
-        f"🌅 *MORNING MARKET BRIEFING*\n"
-        f"*{date_str} | 7:00 AM IST*\n\n"
+        f"🌅 *MORNING MARKET BRIEFING*\n*{date_str} | 7:00 AM IST*\n\n"
         f"──────────────────────────────\n\n"
         f"📊 *GLOBAL MARKETS (Overnight)*\n\n"
         f"▪️ Dow Jones : {get_change('^DJI')}\n"
@@ -400,7 +373,7 @@ async def morning_briefing():
     await send_telegram(msg)
 
 
-async def main():
+async def bot_loop():
     print("✅ Bot Started!")
     await send_live_news()
     while True:
@@ -412,5 +385,15 @@ async def main():
         await asyncio.sleep(60)
 
 
+def run_bot():
+    asyncio.run(bot_loop())
+
+
 if __name__ == "__main__":
-    asyncio.run(main())
+    # Run bot in background thread
+    bot_thread = threading.Thread(target=run_bot, daemon=True)
+    bot_thread.start()
+    # Run Flask web server (satisfies Render port requirement)
+    import os
+    port = int(os.environ.get("PORT", 8080))
+    app.run(host="0.0.0.0", port=port)
