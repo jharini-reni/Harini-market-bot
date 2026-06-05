@@ -4,5 +4,4 @@ rapidfuzz
 pytz
 pandas
 yfinance
-beautifulsoup4
-lxml
+flask
