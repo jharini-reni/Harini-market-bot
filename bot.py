@@ -2,11 +2,10 @@ import asyncio
 import httpx
 import feedparser
 import yfinance as yf
-from datetime import datetime, timedelta
+from datetime import datetime
 from pytz import timezone
 from rapidfuzz import fuzz
 import threading
-import json
 import re
 from flask import Flask
 
@@ -16,10 +15,8 @@ TELEGRAM_URL = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
 IST = timezone("Asia/Kolkata")
 
 SENT_NEWS = []
-SENT_BSE = set()
 LAST_BRIEFING_DATE = None
 SENT_NEWS_FILE = "sent_news.txt"
-SENT_BSE_FILE = "sent_bse.txt"
 
 app = Flask(__name__)
 
@@ -32,133 +29,90 @@ def health():
     return "OK", 200
 
 # =========================================================
-# YOUR WATCHLIST WITH NSE SYMBOLS
+# WATCHLIST
 # =========================================================
-WATCHLIST_SYMBOLS = {
-    "RVNL": "Rail Vikas Nigam",
-    "SUZLON": "Suzlon Energy",
-    "IDEA": "Vodafone Idea",
-    "YESBANK": "Yes Bank",
-    "IREDA": "IREDA",
-    "IEX": "Indian Energy Exchange",
-    "BEL": "Bharat Electronics",
-    "ITC": "ITC",
-    "COALINDIA": "Coal India",
-    "VEDL": "Vedanta",
-    "CANBK": "Canara Bank",
-    "BANKBARODA": "Bank of Baroda",
-    "PNB": "Punjab National Bank",
-    "WIPRO": "Wipro",
-    "TATATECH": "Tata Technologies",
-    "OLAELEC": "Ola Electric",
-    "INOXWIND": "Inox Wind",
-    "MRPL": "MRPL",
-    "JUBLFOOD": "Jubilant FoodWorks",
-    "THANGAMAYL": "Thangamayil Jewellery",
-    "ATHENERGY": "Ather Energy",
-    "KALYANKJIL": "Kalyan Jewellers",
-    "NIVABUPA": "Niva Bupa",
-    "REDINGTON": "Redington",
-    "HYUNDAI": "Hyundai India",
-    "GEOJITFSL": "Geojit Financial",
-    "GOLDBEES": "GoldBees ETF",
-    "SILVERBEES": "SilverBees ETF",
-    "LMNTREE": "Lemon Tree Hotels",
-    "ETERNAL": "Eternal",
-    "HFCL": "HFCL",
-    "IRFC": "IRFC",
-    "DIACABS": "Diamond Cables",
-}
-
-NSE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
-    "Accept": "application/json, text/plain, */*",
-    "Accept-Language": "en-US,en;q=0.9",
-    "Accept-Encoding": "gzip, deflate, br",
-    "Referer": "https://www.nseindia.com/",
-    "Connection": "keep-alive",
-}
-
-BSE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-    "Accept": "application/json, text/plain, */*",
-    "Referer": "https://www.bseindia.com/",
-}
-
-# BSE scrip codes for watchlist stocks
-BSE_CODES = {
-    "RVNL": "543213",
-    "SUZLON": "532667",
-    "IDEA": "532822",
-    "YESBANK": "532648",
-    "IREDA": "544097",
-    "IEX": "540750",
-    "BEL": "500049",
-    "ITC": "500875",
-    "COALINDIA": "533278",
-    "VEDL": "500295",
-    "CANBK": "532483",
-    "BANKBARODA": "532134",
-    "PNB": "532461",
-    "WIPRO": "507685",
-    "TATATECH": "544028",
-    "INOXWIND": "539083",
-    "MRPL": "500109",
-    "JUBLFOOD": "533155",
-    "KALYANKJIL": "543278",
-    "NIVABUPA": "543963",
-    "REDINGTON": "532805",
-    "HFCL": "500183",
-    "IRFC": "543257",
-}
-
-BLOCKED_WORDS = [
-    "should you", "would you", "can you",
-    "is it time", "time to buy", "time to sell",
-    "buy or sell", "buy or avoid", "should you subscribe",
-    "what's buzzing", "what is buzzing", "what's fueling",
-    "where are prices", "where is market",
-    "top stocks", "best stocks", "stocks to buy",
-    "multibagger", "expert suggests", "analyst recommends",
-    "technical analysis", "chart pattern", "moving average",
-    "share price live", "price live update",
-    "sip returns", "mutual fund nav", "how to invest",
-    "beginners guide", "city-wise rates", "check rates",
-    "ipo gmp", "grey market premium", "intraday strategy",
-    "weekly outlook", "monthly outlook",
-    "5 stocks", "10 stocks", "top 5", "top 10",
-    "privacy", "google assistant", "pixel launch",
-    "cautiously optimistic", "earnings revival",
-    "why tcs", "why infosys", "why wipro",
-    "4-year high", "amid ai", "job loss fears",
+WATCHLIST = [
+    "rvnl", "suzlon", "vodafone idea", "yes bank", "ireda", "iex",
+    "bel", "itc", "coal india", "vedanta", "canara bank",
+    "bank of baroda", "pnb", "wipro", "tata tech", "tatatech",
+    "ola electric", "inox wind", "mrpl", "jublfood", "jubilant food",
+    "thangamayil", "ather energy", "kalyan jewellers", "kalyankjil",
+    "niva bupa", "redington", "hyundai india", "diamond cable",
+    "geojit", "goldbees", "silverbees", "lg india", "groww",
+    "lenskart", "samman", "embassy reit", "lemon tree", "eternal",
+    "hfcl", "irfc", "diacabs",
 ]
 
-BLOCKED_NEWS = [
-    "bitcoin", "ethereum", "crypto", "cryptocurrency",
-    "nft", "defi", "binance", "cricket match",
-    "bollywood", "hollywood", "celebrity",
-    "weather forecast", "recipe", "fashion",
-    "horoscope", "astrology", "health tips",
+# =========================================================
+# STRICT BLOCKED — Only block clear junk
+# =========================================================
+BLOCKED_STRICT = [
+    # Questions
+    "what's the last date", "what is the last date",
+    "check details", "check here", "find out",
+    "should you", "would you invest", "is it time",
+    "buy or sell", "buy or avoid",
+    # Analysis/opinion
+    "why tcs", "why infosys", "why wipro", "why nifty",
+    "here's why", "amid ai job", "job loss fears",
+    "4-year high amid", "cautiously optimistic",
+    # Recommendations
+    "top stocks", "best stocks", "multibagger",
+    "expert says", "analyst says buy",
+    "technical analysis", "chart pattern",
+    "sip returns", "mutual fund nav",
+    "how to invest", "beginners guide",
+    "city-wise", "check rates",
+    "ipo gmp", "grey market",
+    "intraday strategy", "weekly outlook",
+    # Irrelevant
+    "bitcoin", "crypto", "ethereum",
+    "cricket", "bollywood", "weather forecast",
+    "horoscope", "health tips", "recipe",
+    "china breaks musk", "elon musk",
+]
+
+# =========================================================
+# ONLY REAL CORPORATE/MARKET NEWS
+# =========================================================
+GOOD_KEYWORDS = [
+    # Results with numbers
+    "net profit", "revenue", "ebitda", "pat rises", "pat falls",
+    "profit rises", "profit falls", "profit jumps", "profit drops",
+    "q1 result", "q2 result", "q3 result", "q4 result",
+    "quarterly result", "annual result",
+    # Corporate actions with specifics
+    "dividend of rs", "dividend declared", "dividend record date",
+    "bonus shares", "stock split", "buyback",
+    "order worth", "order of rs", "bags order", "wins order",
+    "order from", "contract from", "mou with", "mou signed",
+    "capacity expansion", "new plant", "commercial operations",
+    "qip allotment", "block deal", "bulk deal",
+    "promoter buys", "promoter sells", "stake acquired",
+    "merger approved", "acquisition of", "takeover bid",
+    "rating upgraded", "rating downgraded",
+    # Market moving news
+    "nifty", "sensex", "bank nifty", "gift nifty",
+    "fii buys", "fii sells", "fii inflow", "fii outflow",
+    "rbi cuts", "rbi hikes", "repo rate",
+    "rupee falls", "rupee rises", "rupee hits",
+    "crude oil", "brent crude", "opec cuts",
+    "gold rises", "gold falls", "mcx gold",
+    "us fed", "federal reserve", "rate cut", "rate hike",
+    "dow jones", "nasdaq falls", "nasdaq rises",
+    "iran", "war", "middle east", "west asia",
+    "sebi bans", "sebi penalises", "sebi orders",
+    "ipo listing", "listing gains", "listing loss",
+    "india gdp", "cpi inflation", "iip data",
 ]
 
 RSS_FEEDS = [
     "https://economictimes.indiatimes.com/markets/stocks/rssfeeds/2146842.cms",
+    "https://economictimes.indiatimes.com/markets/rssfeeds/1977021501.cms",
     "https://feeds.feedburner.com/ndtvprofit-latest",
     "https://www.business-standard.com/rss/markets-106.rss",
     "https://www.livemint.com/rss/markets",
-]
-
-IMPORTANT_KEYWORDS = [
-    "results", "profit", "loss", "revenue", "ebitda", "q4", "q3", "q2", "q1",
-    "dividend", "bonus", "split", "buyback", "qip", "ofs",
-    "block deal", "bulk deal", "stake", "promoter",
-    "order", "contract", "mou", "agreement", "wins", "bags", "awarded",
-    "merger", "acquisition", "takeover", "demerger",
-    "nifty", "sensex", "bank nifty", "gift nifty",
-    "fii", "fpi", "dii", "rbi", "sebi", "repo rate",
-    "rupee", "crude oil", "gold price", "silver price",
-    "fed", "dow jones", "nasdaq", "iran", "trump", "war",
-    "ipo", "listing", "rating upgrade", "rating downgrade",
+    "https://www.thehindu.com/business/markets/feeder/default.rss",
 ]
 
 
@@ -170,8 +124,10 @@ def load_sent_news():
     try:
         with open(SENT_NEWS_FILE, "r") as f:
             SENT_NEWS = [line.strip() for line in f if line.strip()]
+        print(f"Loaded {len(SENT_NEWS)} sent news")
     except:
         SENT_NEWS = []
+
 
 def save_sent_news():
     try:
@@ -181,173 +137,13 @@ def save_sent_news():
     except:
         pass
 
-def load_sent_bse():
-    global SENT_BSE
-    try:
-        with open(SENT_BSE_FILE, "r") as f:
-            SENT_BSE = set(line.strip() for line in f if line.strip())
-    except:
-        SENT_BSE = set()
-
-def save_sent_bse():
-    try:
-        with open(SENT_BSE_FILE, "w") as f:
-            for item in list(SENT_BSE)[-3000:]:
-                f.write(item + "\n")
-    except:
-        pass
-
 
 # =========================================================
-# TELEGRAM
-# =========================================================
-async def send_telegram(message):
-    async with httpx.AsyncClient() as client:
-        try:
-            await client.post(TELEGRAM_URL, json={
-                "chat_id": CHAT_ID,
-                "text": message,
-                "parse_mode": "Markdown",
-                "disable_web_page_preview": True
-            }, timeout=20)
-            print("✅ Sent!")
-        except Exception as e:
-            print("❌ Telegram Error:", e)
-
-
-# =========================================================
-# NSE CORPORATE ANNOUNCEMENTS
-# =========================================================
-async def fetch_nse_announcements():
-    results = []
-    try:
-        async with httpx.AsyncClient(headers=NSE_HEADERS, follow_redirects=True) as client:
-            # Get NSE cookies first
-            await client.get("https://www.nseindia.com", timeout=10)
-            await asyncio.sleep(1)
-
-            r = await client.get(
-                "https://www.nseindia.com/api/corporate-announcements?index=equities",
-                timeout=15
-            )
-            if r.status_code == 200:
-                data = r.json()
-                for item in data[:50]:
-                    symbol = item.get("symbol", "")
-                    subject = item.get("subject", "").strip()
-                    desc = item.get("desc", "").strip()
-                    an_id = item.get("an_id", str(item.get("exchdisstime", "")))
-
-                    if symbol in WATCHLIST_SYMBOLS and an_id not in SENT_BSE:
-                        SENT_BSE.add(an_id)
-                        results.append({
-                            "symbol": symbol,
-                            "name": WATCHLIST_SYMBOLS.get(symbol, symbol),
-                            "subject": subject,
-                            "desc": desc,
-                            "source": "NSE"
-                        })
-    except Exception as e:
-        print("NSE API Error:", e)
-    return results
-
-
-# =========================================================
-# BSE CORPORATE ANNOUNCEMENTS
-# =========================================================
-async def fetch_bse_announcements():
-    results = []
-    try:
-        async with httpx.AsyncClient(headers=BSE_HEADERS, follow_redirects=True) as client:
-            r = await client.get(
-                "https://api.bseindia.com/BseIndiaAPI/api/AnnSubCategoryGetData/w?pageno=1&category=-1&subcategory=-1&strSearch=&FromDate=&ToDate=&scrip_cd=",
-                timeout=15
-            )
-            if r.status_code == 200:
-                data = r.json()
-                announcements = data.get("Table", [])
-                for item in announcements[:50]:
-                    scrip = str(item.get("SCRIP_CD", ""))
-                    headline = item.get("HEADLINE", "").strip()
-                    news_id = str(item.get("NEWSSUB", item.get("NewsID", "")))
-                    symbol = next((k for k, v in BSE_CODES.items() if v == scrip), None)
-
-                    if symbol and news_id not in SENT_BSE:
-                        SENT_BSE.add(news_id)
-                        results.append({
-                            "symbol": symbol,
-                            "name": WATCHLIST_SYMBOLS.get(symbol, symbol),
-                            "subject": headline,
-                            "desc": "",
-                            "source": "BSE"
-                        })
-    except Exception as e:
-        print("BSE API Error:", e)
-    return results
-
-
-# =========================================================
-# FORMAT ANNOUNCEMENT — KALYAN STYLE
-# =========================================================
-def get_emoji(subject):
-    s = subject.lower()
-    pos = ["profit", "surge", "rise", "gain", "order", "wins", "bags",
-           "dividend", "bonus", "buyback", "approval", "mou", "record",
-           "strong", "beat", "awarded", "contract", "expand", "launch",
-           "acquisition", "commercial operation", "revenue up"]
-    neg = ["loss", "fall", "drop", "penalty", "sebi", "fraud", "default",
-           "selling", "downgrade", "miss", "weak", "concern", "resignation",
-           "misleading", "warning", "decline", "crash"]
-    for w in pos:
-        if w in s:
-            return "🟢"
-    for w in neg:
-        if w in s:
-            return "🔴"
-    return "⚪"
-
-
-def get_sentiment_label(subject):
-    emoji = get_emoji(subject)
-    if emoji == "🟢":
-        return "Positive"
-    elif emoji == "🔴":
-        return "Negative"
-    return "Neutral"
-
-
-def format_announcement(item):
-    symbol = item["symbol"]
-    name = item["name"]
-    subject = item["subject"]
-    desc = item.get("desc", "")
-    source = item["source"]
-    emoji = get_emoji(subject)
-    sentiment = get_sentiment_label(subject)
-
-    msg = f"*{name} – {subject}*\n\n"
-
-    # Add description bullets if available
-    if desc and len(desc) > 20:
-        # Clean HTML
-        desc_clean = re.sub('<[^<]+?>', '', desc).strip()
-        # Split into sentences
-        sentences = [s.strip() for s in re.split(r'[.\n]', desc_clean) if len(s.strip()) > 20]
-        for s in sentences[:3]:
-            msg += f"▪️ {s}\n"
-        msg += "\n"
-
-    msg += f"{emoji} ({sentiment})\n"
-    msg += f"📰 Source: {source} Filing"
-    return msg
-
-
-# =========================================================
-# RSS NEWS FEED
+# FILTERS
 # =========================================================
 def clean_title(title):
     t = title.lower()
-    for w in ["latest", "live", "today", "update", "updates", "|"]:
+    for w in ["|", "watch:", "read:", "also read:"]:
         t = t.replace(w, "")
     return " ".join(t.split())
 
@@ -364,23 +160,44 @@ def is_duplicate(title):
     return False
 
 
-def is_real_news(title):
+def is_good_news(title):
     t = title.lower()
-    if any(w in t for w in BLOCKED_WORDS):
+    # Block junk
+    if any(w in t for w in BLOCKED_STRICT):
         return False
-    if any(w in t for w in BLOCKED_NEWS):
-        return False
-    return any(k in t for k in IMPORTANT_KEYWORDS)
+    # Must have real news keyword
+    return any(k in t for k in GOOD_KEYWORDS)
 
 
-def get_rss_sentiment(title):
+def is_my_stock(title):
+    return any(s in title.lower() for s in WATCHLIST)
+
+
+# =========================================================
+# SENTIMENT
+# =========================================================
+def get_sentiment(title):
     t = title.lower()
-    pos = ["profit", "surge", "rise", "gain", "wins", "bags", "jump",
-           "dividend", "bonus", "buyback", "rally", "approval", "mou",
-           "record high", "strong", "beat", "inflow", "buying"]
-    neg = ["loss", "fall", "drop", "decline", "crash", "penalty",
-           "sebi ban", "fraud", "default", "selling", "outflow",
-           "downgrade", "miss", "weak", "concern", "plunge", "misleading"]
+    pos = [
+        "profit rises", "profit jumps", "profit up", "net profit up",
+        "revenue up", "revenue rises", "revenue grows",
+        "bags order", "wins order", "order from", "mou signed",
+        "dividend declared", "dividend of rs", "bonus shares",
+        "buyback", "rating upgraded", "fii inflow", "fii buys",
+        "rally", "surge", "gain", "rises", "jumps", "climbs",
+        "listing gains", "rate cut", "rbi cuts", "approval",
+        "commercial operations", "capacity expansion",
+        "record high", "all time high", "strong demand",
+    ]
+    neg = [
+        "profit falls", "profit drops", "profit declines", "net profit falls",
+        "revenue falls", "revenue drops", "loss widens", "loss reported",
+        "sebi bans", "sebi penalises", "sebi orders", "fraud",
+        "promoter sells", "stake sale", "fii outflow", "fii sells",
+        "falls", "drops", "declines", "crashes", "plunges", "slips",
+        "listing loss", "rate hike", "rbi hikes", "default",
+        "downgraded", "resignation", "warning", "concern",
+    ]
     for w in pos:
         if w in t:
             return "🟢"
@@ -390,38 +207,162 @@ def get_rss_sentiment(title):
     return "⚪"
 
 
-def get_impact(title):
+# =========================================================
+# BULLET POINTS — ACTUAL CONTENT
+# =========================================================
+def extract_numbers(text):
+    """Extract key numbers/figures from text"""
+    patterns = [
+        r'₹[\d,.]+ ?(?:crore|lakh|billion|million)?',
+        r'rs\.? ?[\d,.]+ ?(?:crore|lakh|billion|million)?',
+        r'\d+\.?\d*%',
+        r'\d+\.?\d*x',
+    ]
+    numbers = []
+    for p in patterns:
+        found = re.findall(p, text.lower())
+        numbers.extend(found)
+    return numbers[:3]
+
+
+def get_bullets(title, summary=""):
     t = title.lower()
-    if ("results" in t or "profit" in t) and ("jump" in t or "surge" in t or "rise" in t):
-        return "Strong quarterly earnings — positive for stock sentiment and near-term outlook."
-    if ("results" in t or "profit" in t) and ("loss" in t or "fall" in t or "miss" in t):
-        return "Weak quarterly earnings — selling pressure likely near-term."
-    if "order" in t and ("win" in t or "bag" in t or "award" in t):
-        return "Order win improves revenue visibility and strengthens order book."
-    if "dividend" in t:
-        return "Dividend declared — investors may accumulate before record date."
-    if "buyback" in t:
-        return "Buyback signals management confidence — positive for shareholders."
-    if "sebi" in t and ("penalty" in t or "ban" in t):
-        return "SEBI regulatory action — governance concern, near-term pressure likely."
-    if "fii" in t or "fpi" in t:
-        return "FII activity — foreign flows are key driver for market direction."
-    if "rbi" in t or "repo rate" in t:
-        return "RBI policy update — banking and rate-sensitive stocks may react sharply."
-    if "crude oil" in t or "brent" in t:
-        return "Crude oil movement impacts India's import bill, rupee and inflation."
-    if "rupee" in t:
-        return "Rupee movement affects IT exporters and import-heavy sectors."
-    if "gift nifty" in t or "dow" in t or "nasdaq" in t:
-        return "Global cues setting direction for Indian market open today."
-    if "iran" in t or "war" in t or "middle east" in t:
-        return "Geopolitical tension may spike crude — negative for India's trade deficit."
-    return "Development closely tracked for potential sector and stock impact."
+    s = summary.lower() if summary else ""
+    bullets = []
+
+    # First bullet = clean headline
+    clean = title.strip()
+    # Remove "check details", "what's the last date" etc from title
+    for remove in ["— check details", ": check details", "what's the last date to buy?",
+                   "- check details", ": details", "| details"]:
+        clean = clean.replace(remove, "").replace(remove.title(), "").strip()
+    bullets.append(clean)
+
+    # Extract numbers from summary
+    if summary:
+        nums = extract_numbers(summary)
+
+    # Second bullet — specific context
+    if "net profit" in t and "rises" in t or "jumps" in t or "up" in t:
+        # Try to find % from title
+        pct = re.search(r'(\d+\.?\d*%)', title)
+        if pct:
+            bullets.append(f"Net profit grew {pct.group(1)} — strong earnings beat estimates.")
+        else:
+            bullets.append("Strong net profit growth — quarterly earnings beat market expectations.")
+
+    elif "net profit" in t and ("falls" in t or "drops" in t or "declines" in t):
+        pct = re.search(r'(\d+\.?\d*%)', title)
+        if pct:
+            bullets.append(f"Net profit declined {pct.group(1)} — below street estimates.")
+        else:
+            bullets.append("Net profit declined — weak quarterly performance below expectations.")
+
+    elif "order" in t and ("bags" in t or "wins" in t or "worth" in t or "from" in t):
+        val = re.search(r'(₹[\d,.]+\s*(?:crore|lakh)?|\d+\.?\d*\s*(?:crore|lakh|billion))', title, re.IGNORECASE)
+        if val:
+            bullets.append(f"Order value: {val.group(1)} — improves revenue visibility and order book.")
+        else:
+            bullets.append("Fresh order win — strengthens revenue pipeline and execution outlook.")
+        bullets.append("Consistent order wins signal strong demand and business momentum.")
+
+    elif "dividend" in t:
+        div = re.search(r'(₹[\d,.]+|rs\.?\s*[\d,.]+)', title, re.IGNORECASE)
+        if div:
+            bullets.append(f"Dividend: {div.group(1)} per share — rewards shareholders.")
+        else:
+            bullets.append("Dividend declared — positive signal for income investors.")
+        bullets.append("Investors may accumulate before record date to qualify for dividend.")
+
+    elif "mou" in t or ("agreement" in t and "sign" in t):
+        bullets.append("Strategic partnership secured — opens new revenue opportunities.")
+        bullets.append("Execution of agreement will be key monitorable going forward.")
+
+    elif "buyback" in t:
+        val = re.search(r'(₹[\d,.]+\s*(?:crore)?)', title, re.IGNORECASE)
+        if val:
+            bullets.append(f"Buyback size: {val.group(1)} — management showing confidence in business.")
+        else:
+            bullets.append("Buyback signals management confidence in company fundamentals.")
+        bullets.append("Shareholders tendering at buyback price may receive premium over CMP.")
+
+    elif "sebi" in t and ("ban" in t or "penali" in t or "order" in t):
+        bullets.append("SEBI regulatory action raises governance concerns — near-term pressure likely.")
+        bullets.append("Company may file appeal — watch for legal developments.")
+
+    elif "commercial operations" in t or "cod" in t:
+        bullets.append("New capacity operational — directly adds to revenue from current quarter.")
+        bullets.append("Positive for earnings growth and order execution track record.")
+
+    elif "fii" in t and ("inflow" in t or "buys" in t or "buying" in t):
+        val = re.search(r'(₹[\d,.]+\s*(?:crore)?)', title, re.IGNORECASE)
+        if val:
+            bullets.append(f"FII inflow: {val.group(1)} — strong foreign confidence in India.")
+        else:
+            bullets.append("FII inflows signal foreign confidence — positive for broader market.")
+        bullets.append("Sustained FII buying may push Nifty to test higher resistance levels.")
+
+    elif "fii" in t and ("outflow" in t or "sells" in t or "selling" in t):
+        bullets.append("FII outflows create near-term selling pressure — watch for reversal signals.")
+        bullets.append("DII buying may provide support — track net flows carefully.")
+
+    elif "rbi" in t and ("cut" in t or "cuts" in t):
+        bullets.append("RBI rate cut boosts liquidity — positive for banking and rate-sensitive sectors.")
+        bullets.append("Housing, auto and NBFC sectors likely to benefit from lower borrowing costs.")
+
+    elif "crude" in t or "brent" in t or "oil" in t:
+        bullets.append("Crude oil movement directly impacts India's import bill and trade deficit.")
+        bullets.append("OMCs, aviation and paint sectors may react to this price movement.")
+
+    elif "gift nifty" in t or "sgx nifty" in t:
+        bullets.append("Pre-market indicator — signals likely opening direction for Nifty 50 today.")
+        bullets.append("Watch if gap sustains or fills in early trade session.")
+
+    elif "dow" in t or "nasdaq" in t or "wall street" in t:
+        bullets.append("US market performance sets tone for Asian markets and FII flows into India.")
+        bullets.append("Nasdaq/Dow movement may influence IT and tech stocks at Indian market open.")
+
+    elif "iran" in t or "middle east" in t or "war" in t:
+        bullets.append("Geopolitical tension may spike crude oil — negative for India's trade deficit.")
+        bullets.append("Risk-off global sentiment may trigger FII outflows from emerging markets.")
+
+    elif "rupee" in t:
+        bullets.append("Rupee weakness benefits IT exporters but pressures oil importers and inflation.")
+        bullets.append("RBI may intervene through dollar sales if rupee movement turns disorderly.")
+
+    elif "qip" in t:
+        val = re.search(r'(₹[\d,.]+\s*(?:crore)?)', title, re.IGNORECASE)
+        if val:
+            bullets.append(f"QIP size: {val.group(1)} — institutional fundraise for expansion/debt reduction.")
+        else:
+            bullets.append("QIP fundraise — institutional capital infusion for growth and expansion.")
+        bullets.append("Dilution impact on EPS to be monitored — watch utilisation of proceeds.")
+
+    elif "merger" in t or "acquisition" in t:
+        bullets.append("M&A deal may unlock significant value — target stock likely to see sharp movement.")
+        bullets.append("Regulatory approvals and synergy benefits will be closely tracked by investors.")
+
+    elif "rating" in t and "upgraded" in t:
+        bullets.append("Credit rating upgrade reduces borrowing costs — positive for margins and expansion.")
+        bullets.append("Higher rating improves access to cheaper capital for future growth plans.")
+
+    elif "block deal" in t or "bulk deal" in t:
+        val = re.search(r'(₹[\d,.]+\s*(?:crore)?)', title, re.IGNORECASE)
+        if val:
+            bullets.append(f"Deal size: {val.group(1)} — large institutional transaction in the stock.")
+        else:
+            bullets.append("Large institutional transaction — watch for follow-up buying or selling.")
+        bullets.append("Identify buyer/seller to gauge direction — promoter sell signals caution.")
+
+    else:
+        bullets.append("Market participants tracking this for direct sector and stock impact.")
+
+    return bullets[:3]
 
 
 def get_source_short(source):
     s = source.lower()
-    if "economic times" in s:
+    if "economic times" in s or "et markets" in s:
         return "ET"
     if "moneycontrol" in s:
         return "Moneycontrol"
@@ -436,70 +377,79 @@ def get_source_short(source):
     return source
 
 
-async def fetch_rss_news():
-    collected = []
-    for url in RSS_FEEDS:
+# =========================================================
+# TELEGRAM
+# =========================================================
+async def send_telegram(message):
+    async with httpx.AsyncClient() as client:
         try:
-            feed = feedparser.parse(url)
-            for entry in feed.entries[:20]:
-                title = entry.title.strip()
-                if not title or len(title) < 15:
-                    continue
-                if is_duplicate(title):
-                    continue
-                if not is_real_news(title):
-                    continue
-                collected.append({
-                    "title": title,
-                    "source": feed.feed.get("title", "News")
-                })
+            await client.post(TELEGRAM_URL, json={
+                "chat_id": CHAT_ID,
+                "text": message,
+                "parse_mode": "Markdown",
+                "disable_web_page_preview": True
+            }, timeout=20)
+            print("✅ Sent!")
         except Exception as e:
-            print("RSS Error:", e)
-    return collected
+            print("❌ Error:", e)
 
 
 # =========================================================
-# SEND ALL NEWS
+# FETCH & SEND NEWS
 # =========================================================
-async def send_all_news():
+async def fetch_and_send():
     now = datetime.now(IST)
     if not (6 <= now.hour <= 23):
         return
 
-    print("🔍 Checking NSE/BSE announcements...")
+    print("📰 Fetching news...")
+    collected = []
 
-    # 1. NSE Corporate Announcements
-    nse_items = await fetch_nse_announcements()
-    for item in nse_items[:5]:
-        msg = format_announcement(item)
-        await send_telegram(msg)
-        await asyncio.sleep(2)
+    for url in RSS_FEEDS:
+        try:
+            feed = feedparser.parse(url)
+            for entry in feed.entries[:25]:
+                title = entry.title.strip()
+                summary = entry.get("summary", "") or ""
+                summary = re.sub('<[^<]+?>', '', summary).strip()
 
-    # 2. BSE Corporate Announcements
-    bse_items = await fetch_bse_announcements()
-    for item in bse_items[:5]:
-        msg = format_announcement(item)
-        await send_telegram(msg)
-        await asyncio.sleep(2)
+                if not title or len(title) < 15:
+                    continue
+                if is_duplicate(title):
+                    continue
+                if not is_good_news(title):
+                    continue
 
-    save_sent_bse()
+                # Prioritise watchlist stocks
+                priority = 1 if is_my_stock(title) else 2
+                collected.append({
+                    "title": title,
+                    "summary": summary,
+                    "source": feed.feed.get("title", "News"),
+                    "priority": priority
+                })
+        except Exception as e:
+            print("RSS Error:", e)
 
-    # 3. RSS News (market/global)
-    print("📰 Checking RSS news...")
-    rss_items = await fetch_rss_news()
-    for item in rss_items[:4]:
+    # Sort — watchlist stocks first
+    collected.sort(key=lambda x: x["priority"])
+
+    if not collected:
+        print("No new news")
+        return
+
+    for item in collected[:6]:
         title = item["title"]
+        summary = item["summary"]
         source = get_source_short(item["source"])
-        sentiment = get_rss_sentiment(title)
-        impact = get_impact(title)
+        sentiment = get_sentiment(title)
+        bullets = get_bullets(title, summary)
 
-        msg = (
-            f"{sentiment} *{title}*\n\n"
-            f"▪️ {impact}\n\n"
-            f"📰 Source: {source}"
-        )
+        bullet_text = "\n".join(f"▪️ {b}" for b in bullets)
+        msg = f"{sentiment}\n\n{bullet_text}\n\n📰 Source: {source}"
+
         await send_telegram(msg)
-        await asyncio.sleep(2)
+        await asyncio.sleep(3)
 
 
 # =========================================================
@@ -561,19 +511,18 @@ async def morning_briefing():
 
 
 # =========================================================
-# MAIN BOT LOOP
+# MAIN LOOP
 # =========================================================
 async def bot_loop():
-    print("✅ Bot Started with NSE + BSE APIs!")
+    print("✅ Bot Started!")
     load_sent_news()
-    load_sent_bse()
-    await send_all_news()
+    await fetch_and_send()
     while True:
         now = datetime.now(IST)
         if now.hour == 7 and now.minute == 0:
             await morning_briefing()
         if now.minute % 10 == 0:
-            await send_all_news()
+            await fetch_and_send()
         await asyncio.sleep(60)
 
 
